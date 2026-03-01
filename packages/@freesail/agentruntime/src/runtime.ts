@@ -6,11 +6,11 @@ import { logger } from '@freesail/logger';
 export interface AgentRuntimeConfig {
   mcpClient: Client;
   /**
-   * Handler for chat messages from the user.
+   * Optional handler for chat messages from the user.
    */
-  chatActionName:string;
-  chatSurfaceId: string;
-  onChat: (message: string, sessionId: string) => Promise<string>;
+  chatActionName?: string;
+  chatSurfaceId?: string;
+  onChat?: (message: string, sessionId: string) => Promise<string>;
   /**
    * Optional handler for component actions.
    * If not provided, actions are formatted as text and sent to `onChat`.
@@ -21,10 +21,10 @@ export interface AgentRuntimeConfig {
 export class FreesailAgentRuntime {
   private mcpClient: Client;
   private processingChain = Promise.resolve();
-  private onChat: (message: string, sessionId: string) => Promise<string>;
+  private onChat?: (message: string, sessionId: string) => Promise<string>;
   private onAction?: (action: any, sessionId: string) => Promise<void>;
-  private chatActionName:string;
-  private chatSurfaceId: string;
+  private chatActionName?: string;
+  private chatSurfaceId?: string;
 
   constructor(config: AgentRuntimeConfig) {
     this.mcpClient = config.mcpClient;
@@ -105,9 +105,10 @@ export class FreesailAgentRuntime {
 
              // Default behavior: Format generic actions as chat
              // Special case: chat_send on __chat is direct chat
-             if (action.name === this.chatActionName && action.surfaceId === this.chatSurfaceId) {
+             if (this.chatActionName && this.chatSurfaceId &&
+                 action.name === this.chatActionName && action.surfaceId === this.chatSurfaceId) {
                 const chatText = (action.context as { text?: string })?.text;
-                if (chatText) {
+                if (chatText && this.onChat) {
                    await this.onChat(chatText, entry.sessionId);
                 }
                 return;
@@ -118,7 +119,9 @@ export class FreesailAgentRuntime {
 
              const clientDataModel = actionMsg._clientDataModel?.dataModel;
              const formatted = formatAction(entry.sessionId, action, clientDataModel);
-             await this.onChat(formatted, entry.sessionId);
+             if (this.onChat) {
+               await this.onChat(formatted, entry.sessionId);
+             }
           });
         }
       }
