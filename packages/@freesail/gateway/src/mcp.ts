@@ -77,6 +77,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const systemPromptText = readFileSync(join(__dirname, 'system-prompt.md'), 'utf-8');
 
+/** Cache of generated catalog prompts keyed by catalogId. Catalogs are immutable after registration. */
+const catalogPromptCache = new Map<string, string>();
+
 /**
  * Creates the MCP server with Freesail tools.
  */
@@ -136,24 +139,28 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
           mimeType: 'text/plain',
         },
         async () => {
-          const prompt = generateCatalogPrompt(catalog);
+          let prompt = catalogPromptCache.get(catalog.catalogId);
+          if (!prompt) {
+            prompt = generateCatalogPrompt(catalog);
+            catalogPromptCache.set(catalog.catalogId, prompt);
 
-          // Optionally write the catalog prompt to a file for inspection.
-          // Set FREESAIL_LOG_DIR=<directory> to enable.
-          const logDir = process.env['FREESAIL_LOG_DIR'];
-          if (logDir) {
-            const slug = catalog.catalogId
-              .replace(/https?:\/\//, '')
-              .replace(/[^a-zA-Z0-9]/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-            const filePath = join(logDir, `catalog-prompt-${slug}.md`);
-            try {
-              mkdirSync(logDir, { recursive: true });
-              writeFileSync(filePath, prompt, 'utf-8');
-              logger.info(`[MCP] Catalog prompt written to: ${filePath}`);
-            } catch (err) {
-              logger.warn(`[MCP] Failed to write catalog prompt to ${filePath}: ${err}`);
+            // Optionally write the catalog prompt to a file for inspection.
+            // Set FREESAIL_LOG_DIR=<directory> to enable.
+            const logDir = process.env['FREESAIL_LOG_DIR'];
+            if (logDir) {
+              const slug = catalog.catalogId
+                .replace(/https?:\/\//, '')
+                .replace(/[^a-zA-Z0-9]/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+              const filePath = join(logDir, `catalog-prompt-${slug}.md`);
+              try {
+                mkdirSync(logDir, { recursive: true });
+                writeFileSync(filePath, prompt, 'utf-8');
+                logger.info(`[MCP] Catalog prompt written to: ${filePath}`);
+              } catch (err) {
+                logger.warn(`[MCP] Failed to write catalog prompt to ${filePath}: ${err}`);
+              }
             }
           }
 
