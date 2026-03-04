@@ -16,7 +16,7 @@
         },
         {
           "type": "object",
-          "description": "Renders text content. Key properties: text (required, the text to display), variant (h1-h5, caption, body; defaults to body).",
+          "description": "Renders text content. Key properties: text (required), variant (h1/h2/h3/h4/h5/caption/body), size (CSS font-size), weight (CSS font-weight), color (CSS color).",
           "properties": {
             "component": {
               "const": "Text"
@@ -37,6 +37,18 @@
                 "caption",
                 "body"
               ]
+            },
+            "size": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "CSS font-size for the text (e.g. '12px', '1.2rem', '2em'). Overrides the size implied by variant."
+            },
+            "weight": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "CSS font-weight (e.g. 'normal', 'bold', '500', '700'). Overrides the weight implied by variant."
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "CSS color for the text (e.g. '#ef4444', 'red', 'var(--freesail-primary)'). Defaults to inherited color."
             }
           },
           "required": [
@@ -455,7 +467,7 @@
         },
         {
           "type": "object",
-          "description": "A styled container with border, shadow, and rounded corners. To make cards stretch to fill their parent's width, either set width to '100%' on the Card, or set align to 'stretch' on the parent Column. Key properties: child (required, ID of the single child component), padding (default '16px'), width, height.",
+          "description": "A styled container with border, shadow, and rounded corners. To make cards stretch to fill their parent's width, either set width to '100%' on the Card, or set align to 'stretch' on the parent Column. Key properties: child (required, ID of the single child component), padding (default '16px'), width, height, background (CSS color value to fill the card, e.g. '#22c55e', 'red', 'rgba(0,0,0,0.5)').",
           "properties": {
             "component": {
               "const": "Card"
@@ -472,6 +484,10 @@
             "height": {
               "description": "The height of the card.",
               "$ref": "../common/common_types.json#/$defs/DynamicString"
+            },
+            "background": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "A CSS color value for the card's background fill. Accepts any valid CSS color, e.g. hex ('#22c55e'), named ('red'), rgb/rgba, hsl. Defaults to the theme surface color."
             },
             "child": {
               "$ref": "../common/common_types.json#/$defs/ComponentId",

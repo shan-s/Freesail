@@ -348,13 +348,14 @@ export function createExpressServer(options: ExpressServerOptions): Express {
  */
 export function startExpressServer(
   app: Express,
-  port: number = 3001
+  port: number = 3001,
+  host: string = '0.0.0.0'
 ): Promise<void> {
   return new Promise((resolve) => {
-    app.listen(port, () => {
-      logger.info(`[Express] HTTP server listening on port ${port}`);
-      logger.info(`[Express] SSE endpoint: http://localhost:${port}/sse`);
-      logger.info(`[Express] Message endpoint: http://localhost:${port}/message`);
+    app.listen(port, host, () => {
+      logger.info(`[Express] HTTP server listening on ${host}:${port}`);
+      logger.info(`[Express] SSE endpoint: http://${host}:${port}/sse`);
+      logger.info(`[Express] Message endpoint: http://${host}:${port}/message`);
       resolve();
     });
   });

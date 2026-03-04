@@ -3,9 +3,9 @@
 # Usage: ./run-all.sh
 #
 # The gateway, agent, and UI all run as independent processes:
-#   - Gateway: MCP SSE server (port 3000, localhost only) + A2UI HTTP/SSE (port 3001)
+#   - Gateway: MCP SSE server (port 3000, localhost only) + A2UI HTTP/SSE (port 3001, all interfaces)
 #   - Agent:   Connects to gateway MCP via SSE, exposes health endpoint (port 3002)
-#   - UI:      Vite dev server (port 5173)
+#   - UI:      Vite dev server (port 5173, all interfaces)
 
 set -e
 
@@ -46,6 +46,18 @@ if [ -z "$GOOGLE_API_KEY" ]; then
   exit 1
 fi
 
+# Detect LAN IP (Linux: hostname -I, macOS: ipconfig getifaddr en0)
+LAN_IP=""
+if command -v hostname &>/dev/null; then
+  LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+fi
+if [ -z "$LAN_IP" ] && command -v ipconfig &>/dev/null; then
+  LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)
+fi
+if [ -z "$LAN_IP" ]; then
+  LAN_IP="<your-ip>"
+fi
+
 cd "$ROOT_DIR"
 
 # Install/update dependencies (always run so workspace links are up to date)
@@ -69,6 +81,7 @@ GATEWAY_MCP_PORT="${MCP_PORT:-3000}"
 AGENT_PORT_NUM="${AGENT_PORT:-3002}"
 
 # 1. Start Gateway (standalone process)
+# Gateway HTTP binds to 0.0.0.0 (all interfaces) by default; MCP stays on localhost.
 echo -e "${BLUE}[Gateway]${NC} Starting on HTTP port ${GATEWAY_HTTP_PORT}, MCP port ${GATEWAY_MCP_PORT}"
 npx tsx "$GATEWAY_SCRIPT" \
   --mcp-mode http \
@@ -103,10 +116,12 @@ sleep 2
 
 echo ""
 echo -e "${GREEN}All services running:${NC}"
-echo -e "  Gateway: http://localhost:${GATEWAY_HTTP_PORT}  (A2UI HTTP/SSE for UI)"
-echo -e "  Gateway: http://127.0.0.1:${GATEWAY_MCP_PORT}  (MCP SSE for agent, localhost only)"
-echo -e "  Agent:   http://localhost:${AGENT_PORT_NUM}  (Health endpoint)"
-echo -e "  UI:      http://localhost:${UI_PORT:-5173}"
+echo -e "  Gateway  (localhost):  http://localhost:${GATEWAY_HTTP_PORT}"
+echo -e "  Gateway  (network):    http://${LAN_IP}:${GATEWAY_HTTP_PORT}"
+echo -e "  MCP                    http://127.0.0.1:${GATEWAY_MCP_PORT}  (agent only, localhost)"
+echo -e "  Agent health:          http://localhost:${AGENT_PORT_NUM}"
+echo -e "  UI       (localhost):  http://localhost:${UI_PORT:-5173}"
+echo -e "  UI       (network):    http://${LAN_IP}:${UI_PORT:-5173}"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
 echo ""

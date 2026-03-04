@@ -13,6 +13,33 @@ import { WeatherCatalog } from '@freesail-community/weathercatalog';
 
 const CHAT_CATALOG_ID = 'https://freesail.dev/catalogs/chat_catalog_v1.json';
 
+/**
+ * Derive the gateway base URL.
+ *
+ * Priority order:
+ *  1. VITE_GATEWAY_URL — full URL (https://api.myapp.com) or path prefix (/ or /api/gateway).
+ *     Use a path prefix when the gateway is reverse-proxied onto the same domain as the UI.
+ *     In that case the app uses relative-origin URLs (/sse, /message) and no CORS is needed.
+ *  2. VITE_GATEWAY_PORT — same host as the UI, different port (e.g. 3001 in dev).
+ *  3. Default: same host, port 3001.
+ */
+function getGatewayOrigin(): string {
+  const gatewayUrl = import.meta.env['VITE_GATEWAY_URL'] as string | undefined;
+
+  if (gatewayUrl) {
+    if (gatewayUrl.startsWith('/')) {
+      // Path-prefix mode: reverse proxy on same domain.
+      // Strip trailing slash so /sse appends cleanly.
+      return `${window.location.protocol}//${window.location.host}${gatewayUrl.replace(/\/$/, '')}`;
+    }
+    // Full URL mode: different domain.
+    return gatewayUrl.replace(/\/$/, '');
+  }
+
+  const port = import.meta.env['VITE_GATEWAY_PORT'] ?? '3001';
+  return `${window.location.protocol}//${window.location.hostname}:${port}`;
+}
+
 const ALL_CATALOGS: ReactUI.CatalogDefinition[] = [
   StandardCatalog,
   ChatCatalog,
@@ -39,8 +66,8 @@ function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <ReactUI.FreesailThemeProvider theme={activeTheme}>
         <ReactUI.FreesailProvider
-          sseUrl="http://localhost:3001/sse"
-          postUrl="http://localhost:3001/message"
+          sseUrl={`${getGatewayOrigin()}/sse`}
+          postUrl={`${getGatewayOrigin()}/message`}
           catalogDefinitions={ALL_CATALOGS}
           onConnectionChange={(connected) => {
             console.log('Connection status:', connected);

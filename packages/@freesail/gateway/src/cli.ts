@@ -20,6 +20,8 @@ interface CLIConfig {
   mcpMode: 'stdio' | 'http';
   /** HTTP port for SSE server */
   httpPort: number;
+  /** HTTP host to bind to */
+  httpHost: string;
   /** MCP HTTP port (if mode is 'http') */
   mcpPort: number;
   /** MCP HTTP host to bind to (if mode is 'http') */
@@ -38,6 +40,7 @@ function parseArgs(): CLIConfig {
   const config: CLIConfig = {
     mcpMode: 'stdio',
     httpPort: 3001,
+    httpHost: '0.0.0.0',
     mcpPort: 3000,
     mcpHost: '127.0.0.1',
   };
@@ -47,6 +50,9 @@ function parseArgs(): CLIConfig {
     switch (arg) {
       case '--http-port':
         config.httpPort = parseInt(args[++i] ?? '3001', 10);
+        break;
+      case '--http-host':
+        config.httpHost = args[++i] ?? '0.0.0.0';
         break;
       case '--mcp-port':
         config.mcpPort = parseInt(args[++i] ?? '3000', 10);
@@ -83,6 +89,7 @@ Usage: freesail-gateway [options]
 
 Options:
   --http-port <port>     Port for the A2UI HTTP/SSE server (default: 3001)
+  --http-host <host>     Host to bind the A2UI HTTP/SSE server to (default: 0.0.0.0)
   --mcp-mode <mode>      MCP transport mode: 'stdio' or 'http' (default: stdio)
   --mcp-port <port>      Port for MCP Streamable HTTP server (default: 3000, http mode only)
   --mcp-host <host>      Host to bind MCP HTTP server to (default: 127.0.0.1, http mode only)
@@ -167,7 +174,7 @@ async function main(): Promise<void> {
     },
   });
 
-  await startExpressServer(app, config.httpPort);
+  await startExpressServer(app, config.httpPort, config.httpHost);
 
   // Handle graceful shutdown
   process.on('SIGINT', () => {

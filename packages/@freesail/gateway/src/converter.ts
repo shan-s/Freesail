@@ -5,6 +5,84 @@
  * This enables the Agent to see available UI components as callable tools.
  */
 
+/**
+ * Bundled definitions from common_types.json and CatalogComponentCommon.
+ * These are inlined so the gateway doesn't need to perform filesystem I/O
+ * or take an extra package dependency to resolve $refs at prompt-generation time.
+ *
+ * Keep in sync with:
+ *   packages/@freesail/catalogs/src/common/common_types.json
+ *   packages/@freesail/catalogs/src/standard_catalog/standard_catalog.json#/$defs
+ */
+const BUNDLED_DEFS: Record<string, Record<string, unknown>> = {
+  // ---- From common_types.json ------------------------------------------------
+  ComponentCommon: {
+    properties: {
+      // 'id' is already documented in the system prompt — skip to avoid noise
+      accessibility: {
+        type: 'object',
+        description: 'Accessibility attributes (label, description) for assistive technologies.',
+      },
+    },
+  },
+  Checkable: {
+    properties: {
+      checks: {
+        type: 'array',
+        description:
+          'A list of validation checks. Each check has a condition (DynamicBoolean) and a message. ' +
+          'If any condition evaluates to false the component shows the error or is disabled.',
+      },
+    },
+  },
+  // ---- From standard_catalog.json $defs -------------------------------------
+  CatalogComponentCommon: {
+    properties: {
+      weight: {
+        type: 'number',
+        description:
+          'Flex-grow weight of this component within a Row or Column container. ' +
+          'Only meaningful when the component is a direct child of a Row or Column.',
+      },
+    },
+  },
+};
+
+/**
+ * Resolve a JSON $ref string to a schema object.
+ *
+ * Handles two patterns:
+ *   - "#/$defs/Foo"           → looks up in catalogDefs, then BUNDLED_DEFS
+ *   - "path/to/file.json#/$defs/Foo" → extracts "Foo" and looks up in BUNDLED_DEFS
+ *
+ * @returns the resolved schema object, or null if it cannot be resolved.
+ */
+function resolveRef(
+  ref: string,
+  catalogDefs?: Record<string, unknown>
+): Record<string, unknown> | null {
+  const hash = ref.indexOf('#');
+  if (hash === -1) return null;
+
+  const fragment = ref.slice(hash + 1); // e.g. "/$defs/Checkable"
+  const parts = fragment.split('/').filter(Boolean); // ["$defs", "Checkable"]
+
+  if (parts.length < 2 || parts[0] !== '$defs') return null;
+  const defName = parts[1];
+  if (!defName) return null; // narrow string | undefined → string
+
+  // 1. Try the catalog's own $defs (for internal #/$defs/... refs)
+  if (catalogDefs && defName in catalogDefs) {
+    return catalogDefs[defName] as Record<string, unknown>;
+  }
+
+  // 2. Fall back to bundled common-type definitions
+  const bundled = BUNDLED_DEFS[defName];
+  if (bundled) return bundled;
+
+  return null;
+}
+
 import { z } from 'zod';
 
 /**
@@ -66,17 +144,22 @@ export interface MCPTool {
  * Converts a catalog to MCP tool schemas.
  */
 export function catalogToMCPTools(catalog: Catalog): MCPTool[] {
+  const catalogDefs = (catalog.$defs ?? {}) as Record<string, unknown>;
   return Object.entries(catalog.components).map(([name, component]) => ({
     name: `render_${name.toLowerCase()}`,
     description: component.description ?? `Render a ${name} component`,
-    inputSchema: componentToSchema(name, component),
+    inputSchema: componentToSchema(name, component, catalogDefs),
   }));
 }
 
 /**
  * Converts a component definition to a JSON Schema.
  */
-function componentToSchema(name: string, component: CatalogComponent): MCPTool['inputSchema'] {
+function componentToSchema(
+  name: string,
+  component: CatalogComponent,
+  catalogDefs?: Record<string, unknown>
+): MCPTool['inputSchema'] {
   const properties: Record<string, unknown> = {
     id: {
       type: 'string',
@@ -112,9 +195,14 @@ function componentToSchema(name: string, component: CatalogComponent): MCPTool['
 
     if (def.allOf) {
       for (const sub of def.allOf) {
-        // Recursive extraction for allOf schemas
-        // We cast sub to CatalogComponent to recurse, assuming it follows the structure
-        extractProperties(sub as CatalogComponent);
+        const subDef = sub as CatalogComponent & { $ref?: string };
+        if (subDef.$ref) {
+          // Resolve external/internal $ref before recursing
+          const resolved = resolveRef(subDef.$ref, catalogDefs);
+          if (resolved) extractProperties(resolved as CatalogComponent);
+        } else {
+          extractProperties(subDef);
+        }
       }
     }
   };
@@ -238,21 +326,36 @@ export function generateCatalogPrompt(catalog: Catalog): string {
     if (component.description) {
       lines.push(`  ${component.description}`);
     }
-    // Helper to collect all properties including from allOf
+    // Helper to collect all properties including from allOf + $ref resolution
     const allProps: Record<string, CatalogProperty> = {};
-    const collectProps = (def: CatalogComponent) => {
+    const collectProps = (def: CatalogComponent, depth = 0) => {
+      if (depth > 5) return; // guard against circular refs
       if (def.properties) {
         Object.assign(allProps, def.properties);
       }
       if (def.allOf) {
-        def.allOf.forEach(sub => collectProps(sub as CatalogComponent));
+        def.allOf.forEach(sub => {
+          const subDef = sub as CatalogComponent & { $ref?: string };
+          if (subDef.$ref) {
+            const resolved = resolveRef(subDef.$ref, catalog.$defs as Record<string, unknown>);
+            if (resolved) collectProps(resolved as CatalogComponent, depth + 1);
+          } else {
+            collectProps(subDef, depth + 1);
+          }
+        });
+      }
+      // Also handle a bare $ref at the top level of a sub-schema
+      if ((def as any).$ref && !def.properties && !def.allOf) {
+        const resolved = resolveRef((def as any).$ref, catalog.$defs as Record<string, unknown>);
+        if (resolved) collectProps(resolved as CatalogComponent, depth + 1);
       }
     };
     collectProps(component);
 
-    // Collect all required fields
+    // Collect all required fields (also follows $refs)
     const requiredFields = new Set<string>();
-    const collectRequired = (def: CatalogComponent) => {
+    const collectRequired = (def: CatalogComponent, depth = 0) => {
+      if (depth > 5) return;
       // Individual property required flag
       if (def.properties) {
         for (const [key, prop] of Object.entries(def.properties)) {
@@ -261,13 +364,21 @@ export function generateCatalogPrompt(catalog: Catalog): string {
       }
       // Top-level required array
       if (Array.isArray((def as any).required)) {
-        ((def as any).required as string[]).forEach(k => requiredFields.add(k));
+        ((def as any).required as string[]).forEach((k: string) => requiredFields.add(k));
       }
       // Recurse
       if (def.allOf) {
-        def.allOf.forEach(sub => collectRequired(sub as CatalogComponent));
+        def.allOf.forEach(sub => {
+          const subDef = sub as CatalogComponent & { $ref?: string };
+          if (subDef.$ref) {
+            const resolved = resolveRef(subDef.$ref, catalog.$defs as Record<string, unknown>);
+            if (resolved) collectRequired(resolved as CatalogComponent, depth + 1);
+          } else {
+            collectRequired(subDef, depth + 1);
+          }
+        });
       }
-    }
+    };
     collectRequired(component);
 
 

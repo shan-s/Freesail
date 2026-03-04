@@ -1,0 +1,90 @@
+# nginx.conf.example — Freesail reverse proxy setup
+#
+# UI (Vite build) and Gateway share the same domain.
+# nginx serves the static UI files and proxies gateway endpoints.
+#
+# Deployment:
+#   1. Build the UI:   cd react-app && npm run build
+#   2. Copy dist/ to   /var/www/freesail
+#   3. Set in env:     VITE_GATEWAY_URL=/
+#   4. Copy this file to /etc/nginx/sites-available/freesail and symlink to sites-enabled
+
+server {
+    listen 80;
+    server_name myapp.com;  # <-- change to your domain
+
+    # Redirect HTTP → HTTPS (remove this block if not using TLS)
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name myapp.com;  # <-- change to your domain
+
+    # TLS certificates (e.g. from Let's Encrypt / certbot)
+    ssl_certificate     /etc/letsencrypt/live/myapp.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/myapp.com/privkey.pem;
+
+    # ── Static UI ────────────────────────────────────────────────────────────
+    root /var/www/freesail;  # <-- path to your Vite dist/ output
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # ── Gateway endpoints ─────────────────────────────────────────────────────
+    # SSE long-polling requires special handling: disable buffering,
+    # increase timeouts, and flush immediately.
+
+    location /sse {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # SSE-specific: disable buffering and keep connection alive
+        proxy_buffering        off;
+        proxy_cache            off;
+        proxy_read_timeout     3600s;  # 1 hour — SSE connections are long-lived
+        proxy_send_timeout     3600s;
+        chunked_transfer_encoding on;
+    }
+
+    location /message {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    location /register-catalogs {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    location /register-surface {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    location /send {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    location /health {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+    }
+}

@@ -8,7 +8,7 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { logger } from '@freesail/logger';
@@ -135,15 +135,38 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
           description: catalog.description ?? `UI component catalog: ${catalog.title}`,
           mimeType: 'text/plain',
         },
-        async () => ({
-          contents: [
-            {
-              uri: catalog.catalogId,
-              mimeType: 'text/plain',
-              text: generateCatalogPrompt(catalog),
-            },
-          ],
-        })
+        async () => {
+          const prompt = generateCatalogPrompt(catalog);
+
+          // Optionally write the catalog prompt to a file for inspection.
+          // Set FREESAIL_LOG_DIR=<directory> to enable.
+          const logDir = process.env['FREESAIL_LOG_DIR'];
+          if (logDir) {
+            const slug = catalog.catalogId
+              .replace(/https?:\/\//, '')
+              .replace(/[^a-zA-Z0-9]/g, '-')
+              .replace(/-+/g, '-')
+              .replace(/^-|-$/g, '');
+            const filePath = join(logDir, `catalog-prompt-${slug}.md`);
+            try {
+              mkdirSync(logDir, { recursive: true });
+              writeFileSync(filePath, prompt, 'utf-8');
+              logger.info(`[MCP] Catalog prompt written to: ${filePath}`);
+            } catch (err) {
+              logger.warn(`[MCP] Failed to write catalog prompt to ${filePath}: ${err}`);
+            }
+          }
+
+          return {
+            contents: [
+              {
+                uri: catalog.catalogId,
+                mimeType: 'text/plain',
+                text: prompt,
+              },
+            ],
+          };
+        }
       );
 
       logger.info(`[MCP] Registered catalog resource: ${catalog.catalogId}`);
