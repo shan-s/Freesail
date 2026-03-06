@@ -21,7 +21,7 @@ Freesail operates on a three-node architecture that separates control logic from
 * **Role:** The translation and streaming engine. Runs as a standalone process.  
 * **Interface:** Exposes an MCP Streamable HTTP Server (Port 3000, localhost only) to the Agent and an HTTP SSE Stream (Port 3001\) to the Client.  
 * **Responsibility:**  
-  * **Catalog Injection:** Receives catalog definitions from clients and injects them into the Agent's system prompt so the Agent knows valid inputs.  
+  * **Catalog Discovery:** Receives catalog definitions from connected clients and exposes them via the `get_catalogs` tool. Agents call `get_catalogs(sessionId)` to receive an array of `{ catalogId, title, content }` objects describing the UI components available for that session.  
   * **Validation:** Validates Agent tool calls against the Catalog schema.  
   * **Streaming:** Pushes validated A2UI payloads to the Client via Server-Sent Events (SSE).
 

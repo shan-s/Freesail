@@ -307,7 +307,12 @@ function propertyToSchema(prop: CatalogProperty): Record<string, unknown> {
 /**
  * Generates the system prompt injection for the catalog.
  */
+const catalogPromptCache = new WeakMap<Catalog, string>();
+
 export function generateCatalogPrompt(catalog: Catalog): string {
+  const cached = catalogPromptCache.get(catalog);
+  if (cached) return cached;
+
   const name = catalog.title;
   const id = catalog.catalogId;
 
@@ -463,7 +468,9 @@ export function generateCatalogPrompt(catalog: Catalog): string {
     }
   }
 
-  return lines.join('\n');
+  const result = lines.join('\n');
+  catalogPromptCache.set(catalog, result);
+  return result;
 }
 
 /**

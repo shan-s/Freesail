@@ -116,12 +116,12 @@ interface ActionEvent {
 ```typescript
 interface AgentRuntimeConfig {
   mcpClient: Client;
-  agentId?: string; // filters get_all_pending_actions to this agent's sessions
+  agentId: string; // scopes get_all_pending_actions to this agent's sessions
   agentFactory: AgentFactory; // (sessionId: string) => FreesailAgent
 }
 ```
 
-> **`agentId` is required for multi-agent deployments.** Without it, the runtime will see actions from all agents' sessions.
+> **`agentId` is required.** It scopes `get_all_pending_actions` to sessions owned by this agent, preventing one agent from draining another agent's action queue.
 
 ---
 
@@ -160,7 +160,7 @@ const cache = new SharedCache(
 const systemPrompt = await cache.getSystemPrompt();
 const tools = await cache.getTools();
 
-// When upstream catalogs change:
+// Invalidate when upstream tools or system prompt change (e.g. new agent version):
 cache.invalidate();
 ```
 
@@ -182,35 +182,26 @@ import { fetchFreesailSystemPrompt } from '@freesail/agentruntime';
 const prompt = await fetchFreesailSystemPrompt(mcpClient);
 ```
 
-### `listCatalogResources(mcpClient)` and `readCatalogResource(mcpClient, uri)`
+### Catalog discovery via `get_catalogs`
 
-> **These two are mandatory for any agent that creates UI surfaces.**
+> **Calling `get_catalogs` is mandatory for any agent that creates UI surfaces.**
 
-The gateway's system prompt tells the LLM it MUST call `list_resources` and `read_resource` to discover available component catalogs before creating a surface. If your LLM doesn't have access to these tools, it will attempt to guess component names and produce invalid UI.
+Agents discover available component catalogs by calling the `get_catalogs` MCP tool with a `sessionId`. It returns an array of catalog objects — each with the catalog ID, title, and full component definitions — in a single call. The agent should do this at the start of a session before calling `create_surface`.
 
 ```typescript
-import { listCatalogResources, readCatalogResource } from '@freesail/agentruntime';
-
-// In your framework adapter — add these as always-available LLM tools:
-
-// Tool 1: list_resources
-const resources = await listCatalogResources(mcpClient);
-// → [{ uri, name, mimeType, description }, ...]
-// → empty array if no catalogs are registered (adapter should inform the user)
-
-// Tool 2: read_resource
-try {
-  const content = await readCatalogResource(mcpClient, uri);
-  // → catalog component definitions as text
-} catch (error) {
-  // readCatalogResource re-throws — return the error as a tool result so
-  // the LLM can tell the user the catalog couldn't be loaded
-}
+// Call the get_catalogs gateway tool:
+const result = await mcpClient.callTool({
+  name: 'get_catalogs',
+  arguments: { sessionId },
+});
+// result.content[0].text is JSON: [{ catalogId, title, content }]
+// catalogId  → the exact string to pass to create_surface
+// content    → full component definitions to include in the LLM system prompt
 ```
 
-The system prompt instructs the LLM what to do on failure:
-- **No catalogs**: tell the user no UI is possible right now.
-- **Read failure**: tell the user which catalog failed and offer alternatives.
+The system prompt instructs the LLM what to do:
+- **Empty array returned**: tell the user no UI is available for this session.
+- **Non-empty array**: use `catalogId` for `create_surface`; include `content` in the context so the LLM knows which components are available.
 
 ### `formatAction(sessionId, action, clientDataModel?)`
 

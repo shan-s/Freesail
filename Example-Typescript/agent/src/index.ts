@@ -110,24 +110,12 @@ logger.info(`MCP prompts: ${prompts.map(p => p.name).join(', ')}`);
 // toolsFactory is passed here so the cache stays framework-agnostic in agentruntime
 const sharedCache = new SharedCache<any[]>(mcpClient, () => LangChainAdapter.getTools(mcpClient));
 
-// Invalidate cache when prompts or resources change upstream
-mcpClient.setNotificationHandler<any>(
-  z.object({ method: z.literal('notifications/prompts/list_changed') }).passthrough(),
-  async () => {
-    logger.info('Prompts changed — invalidating shared cache');
-    sharedCache.invalidate();
-  }
-);
-
+// The gateway sends resources/list_changed on every upstream UI action
+// (to signal pending actions in the mcp://freesail.dev/actions/{sessionId} resource).
+// Catalog content is fetched on-demand via get_catalogs — no cache invalidation needed.
 mcpClient.setNotificationHandler<any>(
   z.object({ method: z.literal('notifications/resources/list_changed') }).passthrough(),
-  async () => {
-    // NOTE: The gateway sends resources/list_changed on every upstream UI action
-    // (to signal pending actions in the mcp://freesail.dev/actions/{sessionId} resource).
-    // Do NOT invalidate the shared cache here — the system prompt and tools have not changed.
-    // Cache invalidation is handled by prompts/list_changed, which the gateway sends
-    // only when a genuinely new catalog resource is registered.
-  }
+  async () => {}
 );
 
 

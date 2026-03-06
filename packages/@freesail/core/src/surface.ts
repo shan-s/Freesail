@@ -132,14 +132,13 @@ export class SurfaceManager {
   }
 
   /**
-   * Clear all active surfaces.
+   * Clear all active surfaces except those that start with __ (which are client managed)
    */
   clearSurfaces(): void {
-    const surfaceIds = Array.from(this.surfaces.keys());
-    this.surfaces.clear();
+    const surfaceIdsToClear = Array.from(this.surfaces.keys()).filter(id => !id.startsWith('__'));
     
-    // Emit deletion event for each surface so hooks/listeners can clean up
-    for (const id of surfaceIds) {
+    for (const id of surfaceIdsToClear) {
+      this.surfaces.delete(id);
       this.emit('surfaceDeleted', id);
     }
   }

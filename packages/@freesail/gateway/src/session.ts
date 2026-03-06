@@ -204,7 +204,7 @@ export class SessionManager {
   /**
    * Get catalogs available to a specific session.
    * Returns catalogs the session registered OR declared in capabilities.
-   * Falls back to all catalogs if no constraints declared (backward compat).
+   * Returns an empty array if no catalog constraints have been declared.
    */
   getCatalogsForSession(sessionId: string): Catalog[] {
     const session = this.sessions.get(sessionId);
@@ -217,8 +217,8 @@ export class SessionManager {
       }
     }
 
-    // If no constraints declared, allow all (backward compat)
-    if (allowedIds.size === 0) return this.getCatalogs();
+    // If no constraints declared, return nothing (don't leak other clients' catalogs)
+    if (allowedIds.size === 0) return [];
 
     return Array.from(allowedIds)
       .map(id => this.catalogStore.get(id))
@@ -244,9 +244,6 @@ export class SessionManager {
   validateCatalogForSession(sessionId: string, catalogId: string): string | null {
     const session = this.sessions.get(sessionId);
     if (!session) return `Session ${sessionId} not found`;
-
-    // If no capabilities and no registered catalogs, allow anything (backward compat)
-    if (!session.capabilities && session.catalogIds.size === 0) return null;
 
     // Check capabilities
     if (session.capabilities?.catalogs.includes(catalogId)) return null;
@@ -604,7 +601,7 @@ export class SessionManager {
     if (existingAgent && existingAgent !== agentId) {
       return {
         success: false,
-        error: `Session ${sessionId} already claimed by agent ${existingAgent}`,
+        error: `Session ${sessionId} is already claimed by another agent`,
       };
     }
 

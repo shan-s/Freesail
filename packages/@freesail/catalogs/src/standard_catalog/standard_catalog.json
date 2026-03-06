@@ -719,43 +719,6 @@
       ],
       "unevaluatedProperties": false
     },
-    "CheckBox": {
-      "type": "object",
-      "allOf": [
-        {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
-        },
-        {
-          "$ref": "#/$defs/CatalogComponentCommon"
-        },
-        {
-          "$ref": "../common/common_types.json#/$defs/Checkable"
-        },
-        {
-          "type": "object",
-          "description": "A checkbox toggle for boolean values. Key properties: label (required), value (required, data binding for the checked state).",
-          "properties": {
-            "component": {
-              "const": "CheckBox"
-            },
-            "label": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
-              "description": "The text to display next to the checkbox."
-            },
-            "value": {
-              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
-              "description": "The current state of the checkbox (true for checked, false for unchecked)."
-            }
-          },
-          "required": [
-            "component",
-            "label",
-            "value"
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
     "ChoicePicker": {
       "type": "object",
       "allOf": [
@@ -899,6 +862,43 @@
           "required": [
             "component",
             "options",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "CheckBox": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A checkbox toggle for boolean values. Key properties: label (required), value (required, data binding for the checked state).",
+          "properties": {
+            "component": {
+              "const": "CheckBox"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The text to display next to the checkbox."
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "The current state of the checkbox (true for checked, false for unchecked)."
+            }
+          },
+          "required": [
+            "component",
+            "label",
             "value"
           ]
         }

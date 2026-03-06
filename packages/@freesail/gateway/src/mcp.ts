@@ -8,7 +8,7 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { logger } from '@freesail/logger';
@@ -116,89 +116,9 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
     }
   );
 
-  // ========================================================================
-  // Catalog Resources
-  // ========================================================================
-
-  // Register catalog resources dynamically when clients provide catalogs
-  const registeredCatalogs = new Set<string>();
-
-  const registerCatalogResources = (catalogs: Catalog[]) => {
-    let newlyRegistered = 0;
-    for (const catalog of catalogs) {
-      if (registeredCatalogs.has(catalog.catalogId)) continue;
-      registeredCatalogs.add(catalog.catalogId);
-      newlyRegistered++;
-
-      // Generate the prompt eagerly at registration time so the first
-      // read_resource call is instant and the log file appears on connection.
-      // The prompt string is captured by the resource handler's closure below.
-      const prompt = generateCatalogPrompt(catalog);
-
-      server.registerResource(
-        catalog.title,
-        catalog.catalogId,
-        {
-          description: catalog.description ?? `UI component catalog: ${catalog.title}`,
-          mimeType: 'text/plain',
-        },
-        async () => ({
-          contents: [{ uri: catalog.catalogId, mimeType: 'text/plain', text: prompt }],
-        })
-      );
-
-      logger.info(`[MCP] Registered catalog resource: ${catalog.catalogId}`);
-
-      // Optionally write the catalog prompt to a file for inspection.
-      // Set FREESAIL_LOG_DIR=<directory> to enable.
-      const logDir = process.env['FREESAIL_LOG_DIR'];
-      if (logDir) {
-        const slug = catalog.catalogId
-          .replace(/https?:\/\//, '')
-          .replace(/[^a-zA-Z0-9]/g, '-')
-          .replace(/-+/g, '-')
-          .replace(/^-|-$/g, '');
-        const filePath = join(logDir, `catalog-prompt-${slug}.md`);
-        try {
-          mkdirSync(logDir, { recursive: true });
-          writeFileSync(filePath, prompt, 'utf-8');
-          logger.info(`[MCP] Catalog prompt written to: ${filePath}`);
-        } catch (err) {
-          logger.warn(`[MCP] Failed to write catalog prompt to ${filePath}: ${err}`);
-        }
-      }
-    }
-
-
-    // Only notify agents if something actually changed — avoids spurious cache
-    // invalidations when clients reconnect with the same catalogs as before.
-    //
-    // Contract:
-    //   sendPromptListChanged → signals new catalogs available; agents SHOULD invalidate their cache.
-    //   sendResourceListChanged → signals new resources (could be catalog OR pending action).
-    if (newlyRegistered > 0) {
-      try {
-        server.sendResourceListChanged();
-        server.sendPromptListChanged(); // Used as the "new catalog" signal for agents
-      } catch {
-        // Server may not be connected yet
-      }
-    }
-  };
-
-  // Listen for catalogs from connected clients
-  sessionManager.onCatalogsRegistered(registerCatalogResources);
-
-  // Also register any catalogs already available
-  const existing = sessionManager.getCatalogs();
-  if (existing.length > 0) {
-    registerCatalogResources(existing);
-  }
-
   // Listen for upstream actions and notify MCP clients.
   // Sends resources/list_changed so resource-polling agents can wake up and check
-  // mcp://freesail.dev/actions/{sessionId}. Does NOT send prompts/list_changed
-  // (that signal is reserved for new catalog registrations).
+  // mcp://freesail.dev/actions/{sessionId}.
   sessionManager.onAction((_sessionId, _message) => {
     try {
       server.sendResourceListChanged();
@@ -557,35 +477,37 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
     'list_sessions',
     {
       description:
-        'List all active client sessions with their surfaces, supported catalogs, ' +
-        'bound agent, and pending action counts. ' +
-        'Use this to discover connected clients and target specific sessions.',
-      inputSchema: {},
+        'List the client sessions owned by this agent, with their surfaces, ' +
+        'supported catalogs, and pending action counts.',
+      inputSchema: {
+        agentId: z.string().describe('Your agent identifier'),
+      },
     },
-    async () => {
-      const summaries = sessionManager.getSessionSummaries();
+    async ({ agentId }) => {
+      const ownedSessionIds = new Set(sessionManager.getSessionsForAgent(agentId));
+      const summaries = sessionManager.getSessionSummaries()
+        .filter(s => ownedSessionIds.has(s.id));
       return {
         content: [
           {
             type: 'text',
             text: summaries.length > 0
               ? JSON.stringify(summaries, null, 2)
-              : 'No active sessions.',
+              : 'No active sessions owned by this agent.',
           },
         ],
       };
     }
   );
 
-  // Tool to get catalog resource URIs for a specific session
+  // Tool to get catalogs and their component definitions for a specific session
   server.registerTool(
     'get_catalogs',
     {
       description:
-        'Get the catalog resource URIs supported by a specific client session. ' +
-        'Returns catalog names and URIs — call read_resource(uri) on each one ' +
-        'to load its component definitions before creating a surface. ' +
-        'Use this instead of list_resources to get only catalogs the session supports.',
+        'Get the catalogs supported by a specific client session, including full component definitions. ' +
+        'Returns an array of { catalogId, title, content } objects. ' +
+        'Use the catalogId when calling create_surface. Read the content to understand available components.',
       inputSchema: {
         sessionId: z.string().describe('The client session ID'),
       },
@@ -611,16 +533,13 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
         };
       }
 
-      const lines = catalogs.map(c =>
-        `- ${c.title} (URI: ${c.catalogId})`
-      );
+      const result = catalogs.map(c => ({
+        catalogId: c.catalogId,
+        title: c.title,
+        content: generateCatalogPrompt(c),
+      }));
       return {
-        content: [{
-          type: 'text',
-          text:
-            `Catalogs available for session ${sessionId}:\n${lines.join('\n')}\n\n` +
-            `Call read_resource(uri) with the exact URI above to load component definitions.`,
-        }],
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       };
     }
   );

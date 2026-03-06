@@ -156,6 +156,21 @@ const mcpClient = new Client(
 await mcpClient.connect(transport);
 ```
 
+### Discovering Catalogs
+
+Before creating a surface, call `get_catalogs` to find out which component catalogs the connected client supports. Each entry contains the `catalogId` needed for `create_surface` and the full component definitions.
+
+```typescript
+const result = await mcpClient.callTool({
+  name: 'get_catalogs',
+  arguments: { sessionId: 'session_abc123' },
+});
+// result.content[0].text → JSON array: [{ catalogId, title, content }]
+// catalogId is the exact string to pass to create_surface
+```
+
+If the array is empty, no catalogs are registered for this session and UI surfaces cannot be created.
+
 ### Creating a Surface
 
 ```typescript
@@ -163,7 +178,7 @@ await mcpClient.callTool({
   name: 'create_surface',
   arguments: {
     surfaceId: 'workspace',
-    catalogId: 'https://freesail.dev/catalogs/standard_catalog_v1.json',
+    catalogId: 'https://freesail.dev/catalogs/standard_catalog_v1.json', // from get_catalogs
     sessionId: 'session_abc123',
   },
 });

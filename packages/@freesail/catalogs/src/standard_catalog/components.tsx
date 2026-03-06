@@ -15,6 +15,45 @@ import type { FunctionCall } from '@freesail/core';
 import { standardCatalogFunctions } from './functions.js';
 
 // =============================================================================
+// Theme Utilities
+// =============================================================================
+
+function getSemanticColor(color: string | undefined): string | undefined {
+  if (!color) return undefined;
+  
+  const semanticMap: Record<string, string> = {
+    textMain: 'var(--freesail-text-main, #0f172a)',
+    textMuted: 'var(--freesail-text-muted, #64748b)',
+    primary: 'var(--freesail-primary, #2563eb)',
+    primaryHover: 'var(--freesail-primary-hover, #1d4ed8)',
+    primaryText: 'var(--freesail-primary-text, #ffffff)',
+    error: 'var(--freesail-error, #ef4444)',
+    success: 'var(--freesail-success, #22c55e)',
+    warning: 'var(--freesail-warning, #f59e0b)',
+    info: 'var(--freesail-info, #3b82f6)',
+  };
+
+  return semanticMap[color] || color;
+}
+
+function getSemanticBackground(bg: string | undefined): string | undefined {
+  if (!bg) return undefined;
+  
+  const semanticMap: Record<string, string> = {
+    bgRoot: 'var(--freesail-bg-root, #f8fafc)',
+    bgSurface: 'var(--freesail-bg-surface, #ffffff)',
+    bgMuted: 'var(--freesail-bg-muted, #f1f5f9)',
+    primary: 'var(--freesail-primary, #2563eb)',
+    error: 'var(--freesail-error, #ef4444)',
+    success: 'var(--freesail-success, #22c55e)',
+    warning: 'var(--freesail-warning, #f59e0b)',
+    info: 'var(--freesail-info, #3b82f6)',
+  };
+
+  return semanticMap[bg] || bg;
+}
+
+// =============================================================================
 // Layout Components
 // =============================================================================
 
@@ -73,8 +112,8 @@ export function Card({ component, children }: FreesailComponentProps) {
     borderRadius: (component['borderRadius'] as string) ?? 'var(--freesail-radius-md)',
     border: '1px solid var(--freesail-border, #e2e8f0)',
     boxShadow: 'var(--freesail-shadow-sm)',
-    background: (component['background'] as string) ?? 'var(--freesail-bg-surface, #ffffff)',
-    color: 'var(--freesail-text-main, #0f172a)',
+    background: getSemanticBackground(component['background'] as string) ?? 'var(--freesail-bg-surface, #ffffff)',
+    color: getSemanticColor(component['color'] as string) ?? 'var(--freesail-text-main, #0f172a)',
   };
 
   return <div style={style}>{children}</div>;
@@ -192,7 +231,7 @@ export function Text({ component }: FreesailComponentProps) {
   const style: CSSProperties = {
     fontSize: (component['size'] as string) ?? '14px',
     fontWeight: (component['weight'] as CSSProperties['fontWeight']) ?? 'normal',
-    color: (component['color'] as string) ?? 'inherit',
+    color: getSemanticColor(component['color'] as string) ?? 'inherit',
     margin: 0,
   };
 
@@ -235,7 +274,7 @@ export function Markdown({ component }: FreesailComponentProps) {
 
   const style: CSSProperties = {
     fontSize: (component['size'] as string) ?? '14px',
-    color: (component['color'] as string) ?? 'inherit',
+    color: getSemanticColor(component['color'] as string) ?? 'inherit',
     lineHeight: 1.5,
   };
 
@@ -607,7 +646,7 @@ export function Image({ component }: FreesailComponentProps) {
 export function Icon({ component }: FreesailComponentProps) {
   const name = String((component['name'] as string) ?? 'circle');
   const size = (component['size'] as string) ?? '24px';
-  const color = (component['color'] as string) ?? 'currentColor';
+  const color = getSemanticColor(component['color'] as string) ?? 'currentColor';
 
   // Simple icon implementation using unicode/emoji fallbacks
   const iconMap: Record<string, string> = {
@@ -638,7 +677,7 @@ export function Icon({ component }: FreesailComponentProps) {
  */
 export function Divider({ component }: FreesailComponentProps) {
   const axis = (component['axis'] as string) ?? 'horizontal';
-  const color = (component['color'] as string) ?? 'var(--freesail-border, #e2e8f0)';
+  const color = getSemanticColor(component['color'] as string) ?? 'var(--freesail-border, #e2e8f0)';
 
   if (axis === 'vertical') {
     return (

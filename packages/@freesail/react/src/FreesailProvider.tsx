@@ -126,7 +126,7 @@ export function FreesailProvider({
       const connected = state === 'connected';
       setIsConnected(connected);
       
-      if (!connected) {
+      if (state === 'disconnected') {
         // Clear all surfaces when connection is lost
         surfaceManager.clearSurfaces();
       }

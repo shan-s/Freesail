@@ -74,8 +74,25 @@ export function WeatherCard({ component }: FreesailComponentProps) {
 
   const background = (component['background'] as string) ?? getConditionGradient(condition);
 
-  const normalizedCondition = condition.toLowerCase().replace(/\s+/g, '-');
-  const isLight = normalizedCondition === 'snowy';
+  const normalizedCondition = condition.toLowerCase().replace(/\\s+/g, '-');
+  
+  let isLight = normalizedCondition === 'snowy' || normalizedCondition === 'foggy';
+  
+  if (component['background']) {
+    const bg = String(component['background']).trim();
+    if (bg.startsWith('#')) {
+      let hex = bg.replace('#', '');
+      if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+      if (hex.length === 6) {
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        isLight = luminance > 0.6;
+      }
+    }
+  }
+
   const textColor = isLight ? 'var(--freesail-text-main, #0f172a)' : 'var(--freesail-primary-text, #ffffff)';
 
   const containerStyle: CSSProperties = {
