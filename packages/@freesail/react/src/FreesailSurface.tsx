@@ -248,7 +248,12 @@ function renderComponent(
     },
   };
 
-  return <Component key={keyOverride ?? componentId} {...props} />;
+  try {
+    return <Component key={keyOverride ?? componentId} {...props} />;
+  } catch (err) {
+    console.error(`[Freesail] Component render error (${componentDef.component}):`, err);
+    return <UnknownComponent component={componentDef} />;
+  }
 }
 
 /**
@@ -413,6 +418,14 @@ export function evaluateFunction(
       return 0; // fallback to stable sort for non-numeric keys
     });
     rawArgs = entries.map(([, value]) => value);
+
+    // Robustness: agents sometimes wrap multiple positional args in a single-key
+    // object as an array, e.g. { "value": [arg0, arg1] } instead of [arg0, arg1].
+    // When there is exactly one entry and its value is an array, spread it so that
+    // multi-arg functions like lte(a, b) receive two arguments, not one array.
+    if (rawArgs.length === 1 && Array.isArray(rawArgs[0])) {
+      rawArgs = rawArgs[0] as unknown[];
+    }
   }
 
   const args = rawArgs.map(arg => {

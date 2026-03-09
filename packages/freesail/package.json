@@ -5,13 +5,16 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "freesail": "./dist/cli.cjs"
+  },
   "files": [
     "dist",
     "docs",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean --external @freesail/core --external @freesail/react"
+    "build": "tsup"
   },
   "devDependencies": {
     "tsup": "^8.0.0"

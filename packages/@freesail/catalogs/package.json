@@ -17,6 +17,10 @@
     "./chat": {
       "types": "./dist/chat_catalog/index.d.ts",
       "import": "./dist/chat_catalog/index.js"
+    },
+    "./common": {
+      "types": "./dist/common/index.d.ts",
+      "import": "./dist/common/index.js"
     }
   },
   "files": [

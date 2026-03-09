@@ -23,6 +23,7 @@
 import type { CatalogDefinition } from '@freesail/react';
 import { standardCatalogComponents } from './components.js';
 import catalogSchema from './standard_catalog.json';
+import catalogPkg from '../../package.json';
 
 // Re-export all individual components for advanced usage
 export * from './components.js';
@@ -50,4 +51,5 @@ export const StandardCatalog: CatalogDefinition = {
   schema: catalogSchema,
   components: standardCatalogComponents,
   functions: standardCatalogFunctions,
+  freesailVersion: catalogPkg.version,
 };

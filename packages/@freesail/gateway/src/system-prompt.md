@@ -159,17 +159,13 @@ Components like `Button` and `TextField` support the `checks` property.
  
 Catalogs define the UI components you can use. Each client session declares which catalogs it supports.
 
-**Before creating any surface, you MUST do the following two steps:**
-1. Call `get_catalogs(sessionId)` to get the list of catalog names and their resource URIs for that specific session.
-2. Call `read_resource(uri)` with the exact URI to load that catalog's component definitions.
+**Before creating any surface, you MUST:**
+Call `get_catalogs(sessionId)` — it returns an array of `{ catalogId, title, content }` objects. The `content` field contains the full component definitions. Use `catalogId` when calling `create_surface`.
 
-Do NOT guess or invent component names. Read the catalog first.
+Do NOT guess or invent component names. Read the catalog `content` first.
 
 **If `get_catalogs` returns no catalogs:**
 Tell the user clearly: "I'm unable to create a UI right now because this session has no component catalogs registered yet. Please wait a moment and try again." Do not attempt to create any surface.
-
-**If `read_resource` fails for a specific catalog URI:**
-Tell the user clearly: "I was unable to load the component definitions for catalog [name]. I cannot create UI components from that catalog right now." Offer to try a different catalog from the same session if others are available, or fall back to a conversational response.
 
 
 ## Session Management

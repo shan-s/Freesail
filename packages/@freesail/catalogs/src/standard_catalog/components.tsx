@@ -421,7 +421,7 @@ export function Button({ component, children, onAction, onFunctionCall }: Freesa
             
             // Check snake_case -> camelCase conversion (e.g. open_url -> openUrl)
             if (!targetFunction && actionName.includes('_')) {
-                 const camelName = actionName.replace(/_([a-z])/g, (_match, p1) => p1.toUpperCase());
+                 const camelName = actionName.replace(/_([a-z])/g, (_match: string, p1: string) => p1.toUpperCase());
                  if (funcs[camelName]) {
                      targetFunction = camelName;
                  }
@@ -542,6 +542,8 @@ export function TextField({ component, onAction, onDataChange }: FreesailCompone
 export function CheckBox({ component, onDataChange }: FreesailComponentProps) {
   const label = (component['label'] as string) ?? '';
   const checked = (component['value'] as boolean) ?? false;
+  const checks = (component['checks'] as any[]) ?? [];
+  const validationError = validateChecks(checks);
   const rawValue = component['__rawValue'] as { path?: string } | boolean | undefined;
   const boundPath = typeof rawValue === 'object' && rawValue?.path ? rawValue.path : null;
   const [localChecked, setLocalChecked] = useState(checked);
@@ -556,20 +558,23 @@ export function CheckBox({ component, onDataChange }: FreesailComponentProps) {
   };
 
   return (
-    <label style={style}>
-      <input
-        type="checkbox"
-        checked={localChecked}
-        onChange={(e) => {
-          const writePath = boundPath ?? `/input/${component.id}`;
-          setLocalChecked(e.target.checked);
-          if (onDataChange) {
-            onDataChange(writePath, e.target.checked);
-          }
-        }}
-      />
-      <span>{label}</span>
-    </label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <label style={style}>
+        <input
+          type="checkbox"
+          checked={localChecked}
+          onChange={(e) => {
+            const writePath = boundPath ?? `/input/${component.id}`;
+            setLocalChecked(e.target.checked);
+            if (onDataChange) {
+              onDataChange(writePath, e.target.checked);
+            }
+          }}
+        />
+        <span>{label}</span>
+      </label>
+      {validationError && <div style={{ fontSize: '12px', color: 'var(--freesail-error, #ef4444)' }}>{validationError}</div>}
+    </div>
   );
 }
 
@@ -924,6 +929,8 @@ export function Slider({ component, onDataChange }: FreesailComponentProps) {
   const min = Number((component['min'] as number) ?? 0);
   const max = Number((component['max'] as number) ?? 100);
   const value = Number((component['value'] as number) ?? min);
+  const checks = (component['checks'] as any[]) ?? [];
+  const validationError = validateChecks(checks);
 
   const rawValue = component['__rawValue'] as { path?: string } | number | undefined;
   const boundPath = typeof rawValue === 'object' && rawValue?.path ? rawValue.path : null;
@@ -955,6 +962,7 @@ export function Slider({ component, onDataChange }: FreesailComponentProps) {
         />
         <span style={{ fontSize: '13px', color: 'var(--freesail-text-muted, #64748b)', minWidth: '32px' }}>{localValue}</span>
       </div>
+      {validationError && <div style={{ fontSize: '12px', color: 'var(--freesail-error, #ef4444)', marginTop: '2px' }}>{validationError}</div>}
     </div>
   );
 }
@@ -962,20 +970,59 @@ export function Slider({ component, onDataChange }: FreesailComponentProps) {
 /**
  * DateTimeInput - date/time picker.
  */
+
+/**
+ * Converts any ISO 8601 string (including UTC "Z" timestamps returned by now())
+ * into the exact format required by a given HTML input type:
+ *   - "date"           → "YYYY-MM-DD"  (local date)
+ *   - "time"           → "HH:mm"       (local time)
+ *   - "datetime-local" → "YYYY-MM-DDThh:mm" (local datetime, no Z)
+ *
+ * If the value is already in the right format, or is not a valid date, it is
+ * returned unchanged so the browser can decide what to do with it.
+ */
+function toInputFormat(value: string, inputType: string): string {
+  if (!value) return value;
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return value;
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const y  = date.getFullYear();
+  const mo = pad(date.getMonth() + 1);
+  const d  = pad(date.getDate());
+  const h  = pad(date.getHours());
+  const mi = pad(date.getMinutes());
+
+  if (inputType === 'date')           return `${y}-${mo}-${d}`;
+  if (inputType === 'time')           return `${h}:${mi}`;
+  if (inputType === 'datetime-local') return `${y}-${mo}-${d}T${h}:${mi}`;
+  return value;
+}
+
 export function DateTimeInput({ component, onDataChange }: FreesailComponentProps) {
   const label = (component['label'] as string) ?? '';
   const value = (component['value'] as string) ?? '';
   const enableDate = (component['enableDate'] as boolean) ?? true;
   const enableTime = (component['enableTime'] as boolean) ?? false;
+  const rawMin = (component['min'] as string) ?? undefined;
+  const rawMax = (component['max'] as string) ?? undefined;
+  const checks = (component['checks'] as any[]) ?? [];
+  const validationError = validateChecks(checks);
 
   const rawValue = component['__rawValue'] as { path?: string } | string | undefined;
   const boundPath = typeof rawValue === 'object' && rawValue?.path ? rawValue.path : null;
 
-  const [localValue, setLocalValue] = useState(value);
-
-  useEffect(() => { setLocalValue(value); }, [value]);
-
   const inputType = enableDate && enableTime ? 'datetime-local' : enableTime ? 'time' : 'date';
+
+  // Normalize value, min and max to the format the browser input expects.
+  // This handles ISO strings from now() (UTC "Z" suffix) as well as plain date strings.
+  const normalizedValue = toInputFormat(value, inputType);
+  const min = rawMin !== undefined ? toInputFormat(rawMin, inputType) : undefined;
+  const max = rawMax !== undefined ? toInputFormat(rawMax, inputType) : undefined;
+
+  const [localValue, setLocalValue] = useState(normalizedValue);
+
+  useEffect(() => { setLocalValue(normalizedValue); }, [normalizedValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -993,15 +1040,18 @@ export function DateTimeInput({ component, onDataChange }: FreesailComponentProp
         type={inputType}
         value={localValue}
         onChange={handleChange}
+        min={min}
+        max={max}
         style={{
           padding: '0.5rem 0.75rem',
           borderRadius: 'var(--freesail-radius-md)',
-          border: '1px solid var(--freesail-border, #e2e8f0)',
+          border: validationError ? '1px solid var(--freesail-error, #ef4444)' : '1px solid var(--freesail-border, #e2e8f0)',
           fontSize: '14px',
           backgroundColor: 'var(--freesail-bg-root, #ffffff)',
           color: 'var(--freesail-text-main, #0f172a)',
         }}
       />
+      {validationError && <div style={{ fontSize: '12px', color: 'var(--freesail-error, #ef4444)', marginTop: '2px' }}>{validationError}</div>}
     </div>
   );
 }
@@ -1012,6 +1062,8 @@ export function DateTimeInput({ component, onDataChange }: FreesailComponentProp
 export function ChoicePicker({ component, onDataChange }: FreesailComponentProps) {
   const label = String((component['label'] as string) ?? '');
   const variant = (component['variant'] as string) ?? 'mutuallyExclusive';
+  const checks = (component['checks'] as any[]) ?? [];
+  const validationError = validateChecks(checks);
 
   const rawOptions = component['options'];
 
@@ -1092,6 +1144,7 @@ export function ChoicePicker({ component, onDataChange }: FreesailComponentProps
             </label>
           ))}
         </div>
+        {validationError && <div style={{ fontSize: '12px', color: 'var(--freesail-error, #ef4444)', marginTop: '2px' }}>{validationError}</div>}
       </div>
     );
   }
@@ -1105,13 +1158,14 @@ export function ChoicePicker({ component, onDataChange }: FreesailComponentProps
         <select
           value={localValue[0] ?? ''}
           onChange={handleSelectChange}
-          style={{ padding: '0.5rem 0.75rem', borderRadius: 'var(--freesail-radius-md)', border: '1px solid var(--freesail-border, #e2e8f0)', backgroundColor: 'var(--freesail-bg-root, #ffffff)', color: 'var(--freesail-text-main, #0f172a)' }}
+          style={{ padding: '0.5rem 0.75rem', borderRadius: 'var(--freesail-radius-md)', border: validationError ? '1px solid var(--freesail-error, #ef4444)' : '1px solid var(--freesail-border, #e2e8f0)', backgroundColor: 'var(--freesail-bg-root, #ffffff)', color: 'var(--freesail-text-main, #0f172a)' }}
         >
           <option value="" disabled>Select an option</option>
           {options.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
+        {validationError && <div style={{ fontSize: '12px', color: 'var(--freesail-error, #ef4444)', marginTop: '2px' }}>{validationError}</div>}
       </div>
     );
   }
@@ -1132,6 +1186,7 @@ export function ChoicePicker({ component, onDataChange }: FreesailComponentProps
           </label>
         ))}
       </div>
+      {validationError && <div style={{ fontSize: '12px', color: 'var(--freesail-error, #ef4444)', marginTop: '2px' }}>{validationError}</div>}
     </div>
   );
 }
@@ -1143,6 +1198,8 @@ export function Dropdown({ component, onDataChange }: FreesailComponentProps) {
   const label = component['label'] as string | undefined;
   const hideLabel = (component['hideLabel'] as boolean) ?? false;
   const placeholder = (component['placeholder'] as string | undefined) ?? 'Select an option';
+  const checks = (component['checks'] as any[]) ?? [];
+  const validationError = validateChecks(checks);
 
   const rawOptions = component['options'];
 
@@ -1185,13 +1242,14 @@ export function Dropdown({ component, onDataChange }: FreesailComponentProps) {
       <select
         value={localValue}
         onChange={handleChange}
-        style={{ padding: '0.5rem 0.75rem', borderRadius: 'var(--freesail-radius-md)', border: '1px solid var(--freesail-border, #e2e8f0)', fontSize: '14px', backgroundColor: 'var(--freesail-bg-root, #ffffff)', color: 'var(--freesail-text-main, #0f172a)' }}
+        style={{ padding: '0.5rem 0.75rem', borderRadius: 'var(--freesail-radius-md)', border: validationError ? '1px solid var(--freesail-error, #ef4444)' : '1px solid var(--freesail-border, #e2e8f0)', fontSize: '14px', backgroundColor: 'var(--freesail-bg-root, #ffffff)', color: 'var(--freesail-text-main, #0f172a)' }}
       >
         <option value="" disabled>{placeholder}</option>
         {options.map(opt => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
+      {validationError && <div style={{ fontSize: '12px', color: 'var(--freesail-error, #ef4444)', marginTop: '2px' }}>{validationError}</div>}
     </div>
   );
 }

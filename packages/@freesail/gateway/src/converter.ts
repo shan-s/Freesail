@@ -84,6 +84,7 @@ function resolveRef(
 }
 
 import { z } from 'zod';
+import Ajv, { type ValidateFunction } from 'ajv';
 
 /**
  * Schema for a component property in the catalog.
@@ -96,6 +97,9 @@ export interface CatalogProperty {
   default?: unknown;
   items?: CatalogProperty;
   $ref?: string;
+  oneOf?: CatalogProperty[];
+  anyOf?: CatalogProperty[];
+  allOf?: CatalogProperty[];
 }
 
 /**
@@ -125,6 +129,8 @@ export interface Catalog {
     parameters?: Record<string, unknown>;
     returnType?: string;
   }>;
+  /** Freesail SDK version the client catalog was built against. Used for future compatibility checks. */
+  freesailSdkVersion?: string;
 }
 
 /**
@@ -238,35 +244,47 @@ function componentToSchema(
  * Converts a property definition to JSON Schema.
  */
 function propertyToSchema(prop: CatalogProperty): Record<string, unknown> {
-  // If it's a ref to DynamicString/Number etc, treat as the base type
-  // Common binding schema
+  // Common schemas for data binding and function call forms
   const bindingSchema = {
     type: 'object',
     properties: { path: { type: 'string' } },
     required: ['path'],
   };
+  // Function call {call: "name", ...} — resolved client-side, passes validation
+  const functionCallSchema = {
+    type: 'object',
+    required: ['call'],
+    properties: { call: { type: 'string' } },
+  };
 
   if (prop.$ref) {
     const ref = prop.$ref;
-    if (ref.includes('DynamicString')) {
+    const refBaseName = ref.split('/').pop() || '';
+    if (refBaseName === 'DynamicStringList') {
       return {
-        anyOf: [{ type: 'string' }, bindingSchema],
+        anyOf: [{ type: 'array', items: { type: 'string' } }, bindingSchema, functionCallSchema],
         description: prop.description,
       };
     }
-    if (ref.includes('DynamicNumber')) {
+    if (refBaseName === 'DynamicString') {
       return {
-        anyOf: [{ type: 'number' }, bindingSchema],
+        anyOf: [{ type: 'string' }, bindingSchema, functionCallSchema],
         description: prop.description,
       };
     }
-    if (ref.includes('DynamicBoolean')) {
+    if (refBaseName === 'DynamicNumber') {
       return {
-        anyOf: [{ type: 'boolean' }, bindingSchema],
+        anyOf: [{ type: 'number' }, bindingSchema, functionCallSchema],
         description: prop.description,
       };
     }
-    if (ref.includes('ChildList')) {
+    if (refBaseName === 'DynamicBoolean') {
+      return {
+        anyOf: [{ type: 'boolean' }, bindingSchema, functionCallSchema],
+        description: prop.description,
+      };
+    }
+    if (refBaseName === 'ChildList') {
       return {
         anyOf: [
           { type: 'array', items: { type: 'string' } },
@@ -279,10 +297,37 @@ function propertyToSchema(prop: CatalogProperty): Record<string, unknown> {
         description: prop.description,
       };
     }
+    // Unresolved $ref (e.g. Action, DynamicValue, custom types) — accept any value
+    return prop.description ? { description: prop.description } : {};
+  }
+
+  // Handle oneOf / anyOf / allOf by recursing into each branch
+  if (prop.oneOf) {
+    return {
+      oneOf: prop.oneOf.map(p => propertyToSchema(p)),
+      ...(prop.description ? { description: prop.description } : {}),
+    };
+  }
+  if (prop.anyOf) {
+    return {
+      anyOf: prop.anyOf.map(p => propertyToSchema(p)),
+      ...(prop.description ? { description: prop.description } : {}),
+    };
+  }
+  if (prop.allOf) {
+    return {
+      allOf: prop.allOf.map(p => propertyToSchema(p)),
+      ...(prop.description ? { description: prop.description } : {}),
+    };
+  }
+
+  if (!prop.type) {
+    // No type info — accept any value
+    return prop.description ? { description: prop.description } : {};
   }
 
   const schema: Record<string, unknown> = {
-    type: (prop.type || 'string') as 'string' | 'number' | 'boolean' | 'object' | 'array', // Default to string if type is missing
+    type: prop.type,
   };
 
   if (prop.description) {
@@ -398,12 +443,41 @@ export function generateCatalogPrompt(catalog: Catalog): string {
 
         // Handle $ref types for display
         let typeStr: string | undefined = prop.type as string | undefined;
-        if (!typeStr && prop.$ref) {
+        if (!typeStr && (prop.oneOf || prop.anyOf)) {
+          const branches = (prop.oneOf ?? prop.anyOf)!;
+          typeStr = branches
+            .map(b => {
+              if (b.$ref) {
+                const base = b.$ref.split('/').pop() || 'unknown';
+                if (base === 'DataBinding') return '{"path":"..."}';
+                if (base.startsWith('Dynamic')) return base.replace('Dynamic', '').toLowerCase();
+                return base;
+              }
+              if (b.type === 'array') return 'array[object]';
+              return b.type ?? 'any';
+            })
+            .join(' | ');
+        } else if (!typeStr && prop.allOf) {
+          // allOf: find the first branch with a meaningful $ref or type (other branches are typically constraints)
+          const primary = prop.allOf.find((b: CatalogProperty) => b.$ref || b.type);
+          if (primary?.$ref) {
+            const base = primary.$ref.split('/').pop() || 'unknown';
+            if (base.startsWith('Dynamic')) {
+              const plainType = base.replace('Dynamic', '').toLowerCase();
+              typeStr = `${plainType} | {"path":"..."} | {"call":"..."}`;
+            } else {
+              typeStr = base;
+            }
+          } else if (primary?.type) {
+            typeStr = primary.type as string;
+          }
+        } else if (!typeStr && prop.$ref) {
           const ref = prop.$ref;
           const baseType = ref.split('/').pop() || 'unknown';
 
           if (baseType.startsWith('Dynamic')) {
-            typeStr = `${baseType.replace('Dynamic', '').toLowerCase()} | Binding`;
+            const plainType = baseType.replace('Dynamic', '').toLowerCase();
+            typeStr = `${plainType} | {"path":"..."} | {"call":"..."}`;
           } else if (baseType === 'ChildList') {
             typeStr = 'string[] | ChildTemplate';
           } else {
@@ -415,7 +489,7 @@ export function generateCatalogPrompt(catalog: Catalog): string {
             const ref = prop.items.$ref;
             const baseType = ref.split('/').pop() || 'unknown';
             if (baseType.startsWith('Dynamic')) {
-              itemTypeStr = `${baseType.replace('Dynamic', '').toLowerCase()} | Binding`;
+              itemTypeStr = `${baseType.replace('Dynamic', '').toLowerCase()} | {"path":"..."} | {"call":"..."}`;
             } else if (baseType === 'ChildList') {
               itemTypeStr = 'string[] | ChildTemplate';
             } else {
@@ -425,8 +499,9 @@ export function generateCatalogPrompt(catalog: Catalog): string {
           typeStr = `array[${itemTypeStr || 'unknown'}]`;
         }
 
-        const desc = prop.description ? ` - ${prop.description}` : '';
-        const line = `    - ${propName}: ${typeStr}${desc}`;
+        const enumSuffix = prop.enum && prop.enum.length > 0 ? ` (values: ${prop.enum.join(', ')})` : '';
+        const desc = prop.description ? ` — ${prop.description}` : '';
+        const line = `    - ${propName}: ${typeStr}${enumSuffix}${desc}`;
 
         if (requiredFields.has(propName)) {
           reqProps.push(line);
@@ -473,233 +548,62 @@ export function generateCatalogPrompt(catalog: Catalog): string {
   return result;
 }
 
+// Ajv singleton — compiled validators are cached per component type per catalog
+const ajv = new Ajv({ allErrors: true, strict: false });
+
+// Cache: "catalogId:componentType" → compiled validator
+const componentValidators = new Map<string, ValidateFunction>();
+
+function getComponentValidator(catalog: Catalog, componentType: string): ValidateFunction | null {
+  const key = `${catalog.catalogId}:${componentType.toLowerCase()}`;
+  const cached = componentValidators.get(key);
+  if (cached) return cached;
+
+  const entry = Object.entries(catalog.components).find(
+    ([name]) => name.toLowerCase() === componentType.toLowerCase()
+  );
+  if (!entry) return null;
+
+  const [name, component] = entry;
+  const catalogDefs = (catalog.$defs ?? {}) as Record<string, unknown>;
+  const schema = componentToSchema(name, component, catalogDefs);
+  const validator = ajv.compile(schema);
+  componentValidators.set(key, validator);
+  return validator;
+}
+
 /**
- * Validates a component instance against the catalog using JSON schema validation.
+ * Validates a component instance against the catalog using ajv.
+ * The compiled schema comes from componentToSchema(), which is the same schema
+ * projected to the agent as an MCP tool — so the two are always in sync.
  */
 export function validateComponent(
   catalog: Catalog,
   componentType: string,
   props: Record<string, unknown>
 ): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  // Case-insensitive lookup
-  const entry = Object.entries(catalog.components).find(
+  if (!Object.entries(catalog.components).find(
     ([name]) => name.toLowerCase() === componentType.toLowerCase()
-  );
-
-  if (!entry) {
-    return {
-      valid: false,
-      errors: [`Unknown component type: ${componentType}`],
-    };
+  )) {
+    return { valid: false, errors: [`Unknown component type: ${componentType}`] };
   }
 
-  const [, componentDef] = entry;
-
-  // Build a complete schema for this component by merging allOf schemas
-  const mergedSchema: any = {
-    type: 'object',
-    properties: {},
-    required: [],
-  };
-
-  // Recursively collect properties and required fields from allOf
-  const collectFromDef = (def: any) => {
-    if (def.properties) {
-      Object.assign(mergedSchema.properties, def.properties);
-    }
-    if (def.required && Array.isArray(def.required)) {
-      mergedSchema.required.push(...def.required);
-    }
-    if (def.allOf && Array.isArray(def.allOf)) {
-      def.allOf.forEach((subDef: any) => collectFromDef(subDef));
-    }
-  };
-
-  collectFromDef(componentDef);
-
-  // Debug logging
-  if (componentType.toLowerCase() === 'choicepicker') {
-    console.error('[Validation Debug] ChoicePicker validation:', {
-      componentType,
-      propsKeys: Object.keys(props),
-      options: props['options'],
-      optionsType: typeof props['options'],
-      isArray: Array.isArray(props['options']),
-      mergedSchemaOptions: mergedSchema.properties.options,
-    });
+  const validator = getComponentValidator(catalog, componentType);
+  if (!validator) {
+    return { valid: false, errors: [`Could not build validator for component: ${componentType}`] };
   }
 
-  // Preprocess props to handle data bindings
-  // Data bindings ({path: "..."}) should skip validation since they're resolved client-side
-  const propsToValidate: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(props)) {
-    // Skip 'component' field
-    if (key === 'component' || key === 'id') {
-      propsToValidate[key] = value;
-      continue;
-    }
+  const valid = validator(props);
+  if (valid) return { valid: true, errors: [] };
 
-    // Check if value is a data binding object
-    if (
-      value &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      'path' in value &&
-      typeof (value as any).path === 'string'
-    ) {
-      // Skip validation for data bindings - they're resolved at runtime
-      continue;
-    }
+  const errors = (validator.errors ?? []).map(err => {
+    const field = err.instancePath
+      ? err.instancePath.replace(/^\//, '')
+      : (err.params as any)?.missingProperty ?? 'field';
+    return `${field}: ${err.message}`;
+  });
 
-    // For arrays, check if any element is a data binding
-    if (Array.isArray(value)) {
-      const hasBinding = value.some(
-        item =>
-          item &&
-          typeof item === 'object' &&
-          'path' in item &&
-          typeof (item as any).path === 'string'
-      );
-      if (hasBinding) {
-        // Skip validation if array contains data bindings
-        continue;
-      }
-    }
-
-    propsToValidate[key] = value;
-  }
-
-  // Check required properties first (shallow check before deep validation)
-  const requiredFields = new Set<string>(mergedSchema.required || []);
-  for (const fieldName of requiredFields) {
-    if (fieldName === 'component') continue;
-    if (!(fieldName in props)) {
-      errors.push(`Missing required property: ${fieldName}`);
-    }
-  }
-
-  // If missing required fields, return early
-  if (errors.length > 0) {
-    return { valid: false, errors };
-  }
-
-  // Deep validation of property types and structures
-  // We'll do a manual check here instead of using Ajv to avoid the complexity of
-  // resolving $refs at runtime. Focus on common validation issues like array item types.
-  for (const [propName, propValue] of Object.entries(propsToValidate)) {
-    if (propName === 'component' || propName === 'id') continue;
-
-    const propSchema = mergedSchema.properties[propName];
-    if (!propSchema) continue; // Unknown property, allow it (catalogs may have unevaluatedProperties)
-
-    // Validate array items if schema specifies items structure
-    if (propSchema.type === 'array' && propSchema.items && Array.isArray(propValue)) {
-      const itemSchema = propSchema.items;
-
-      // Check if items should be primitive types
-      if (itemSchema.type === 'string' || itemSchema.type === 'number' || itemSchema.type === 'boolean') {
-        for (let i = 0; i < propValue.length; i++) {
-          const item = propValue[i];
-          if (typeof item !== itemSchema.type) {
-            errors.push(
-              `Property '${propName}[${i}]' must be of type ${itemSchema.type}. Got ${typeof item}.`
-            );
-          }
-        }
-      }
-
-      // Check if items should be objects with specific properties
-      if (itemSchema.type === 'object' && itemSchema.properties) {
-        for (let i = 0; i < propValue.length; i++) {
-          const item = propValue[i];
-
-          // Check if item is an object
-          if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-            errors.push(
-              `Property '${propName}[${i}]' must be an object with properties: ${Object.keys(itemSchema.properties).join(', ')}. Got ${typeof item === 'string' ? `string "${item}"` : typeof item}.`
-            );
-            continue;
-          }
-
-          // Check required properties on the item
-          const itemRequired = itemSchema.required || [];
-          for (const reqField of itemRequired) {
-            if (!(reqField in item)) {
-              errors.push(
-                `Property '${propName}[${i}]' is missing required field: ${reqField}`
-              );
-            }
-          }
-        }
-      }
-    }
-
-    // Validate oneOf schemas (for options that can be array OR DataBinding)
-    if (propSchema.oneOf && Array.isArray(propSchema.oneOf)) {
-      // Check if value matches at least one of the oneOf schemas
-      let matchedSchema = false;
-
-      for (const subSchema of propSchema.oneOf) {
-        // Check for DataBinding pattern
-        if (subSchema.$ref && subSchema.$ref.includes('DataBinding')) {
-          if (
-            typeof propValue === 'object' &&
-            propValue !== null &&
-            'path' in propValue
-          ) {
-            matchedSchema = true;
-            break;
-          }
-        }
-
-        // Check for array type
-        if (subSchema.type === 'array') {
-          if (Array.isArray(propValue)) {
-            // Validate array items if specified
-            if (subSchema.items) {
-              const itemSchema = subSchema.items;
-              if (itemSchema.type === 'object' && itemSchema.properties) {
-                // Check if all items are objects with required fields
-                let allItemsValid = true;
-                for (let i = 0; i < propValue.length; i++) {
-                  const item = propValue[i];
-                  if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-                    errors.push(
-                      `Property '${propName}[${i}]' must be an object with properties: ${Object.keys(itemSchema.properties).join(', ')}. Got ${typeof item === 'string' ? `string "${item}"` : typeof item}.`
-                    );
-                    allItemsValid = false;
-                  }
-                }
-                if (allItemsValid) {
-                  matchedSchema = true;
-                  break;
-                }
-              } else {
-                matchedSchema = true;
-                break;
-              }
-            } else {
-              matchedSchema = true;
-              break;
-            }
-          }
-        }
-      }
-
-      if (!matchedSchema && propSchema.oneOf.length > 0 && errors.length === 0) {
-        errors.push(
-          `Property '${propName}' does not match any allowed schema. Expected one of: ${propSchema.oneOf.map((s: any) => s.type || (s.$ref ? 'DataBinding' : 'unknown')).join(' | ')}.`
-        );
-      }
-    }
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
+  return { valid: false, errors };
 }
 
 // Zod schemas for runtime validation
@@ -733,35 +637,38 @@ const catalogFunctionSchema = z.object({
 
 export const catalogSchema = z.object({
   id: z.string().optional(),
-  catalogId: z.string().optional(),
-  title: z.string().optional(),
+  catalogId: z.string(),
+  title: z.string(),
   name: z.string().optional(),
   version: z.string().optional(),
   description: z.string().optional(),
   $defs: z.record(z.unknown()).optional(),
   components: z.record(catalogComponentSchema),
   functions: z.array(catalogFunctionSchema).optional(),
+  freesailSdkVersion: z.string().optional(),
 }).passthrough();
 
 /**
  * Parse and validate a catalog JSON.
  */
 export function parseCatalog(json: unknown): Catalog {
-  // Use safeParse to avoid throwing errors on partial mismatches during migration
-  const result = catalogSchema.safeParse(json);
+  // Normalise legacy field names before validation so older catalogs still work
+  const input = (typeof json === 'object' && json !== null)
+    ? { ...(json as Record<string, unknown>) }
+    : json;
+  if (typeof input === 'object' && input !== null) {
+    const obj = input as Record<string, unknown>;
+    if (!obj['catalogId'] && obj['$id']) obj['catalogId'] = obj['$id'];
+    if (!obj['title'] && obj['name']) obj['title'] = obj['name'];
+  }
 
+  const result = catalogSchema.safeParse(input);
   if (!result.success) {
-    console.warn("Catalog validation warning:", result.error);
-    const cat = json as Catalog;
-    // Polyfill id from catalogId or $id if missing
-    if (!cat.id) {
-      cat.id = cat.catalogId || (cat as any).$id || 'unknown';
-    }
-    return cat;
+    const issues = result.error.issues.map(i => `${i.path.join('.') || 'root'}: ${i.message}`).join('; ');
+    throw new Error(`Invalid catalog: ${issues}`);
   }
 
   const cat = result.data as Catalog;
-  // Ensure id is present
   if (!cat.id) {
     cat.id = cat.catalogId || (cat as any).$id || 'unknown';
   }

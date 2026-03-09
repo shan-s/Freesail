@@ -1,8 +1,8 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "../../schemas/catalog.schema.json",
   "$id": "https://freesail.dev/catalogs/standard_catalog_v1.json",
   "title": "Freesail Standard Catalog",
-  "description": "Unified catalog of standard A2UI components and functions.",
+  "description": "Unified catalog of standard A2UI components and functions.\n\n### Function Call Syntax\n\nWhen using functions in component properties (e.g. `checks`, `value`, `text`, `min`, `max`):\n\n**Single-argument functions** (`not`, `isEmpty`, `required`, `email`, `regex`, etc.) use a named-key object for `args`:\n```json\n{ \"call\": \"not\", \"args\": { \"value\": { \"call\": \"isEmpty\", \"args\": { \"value\": { \"path\": \"/data/x\" } } } } }\n```\n\n**Multi-argument functions** (`lte`, `gte`, `lt`, `gt`, `eq`, `neq`, `and`, `or`, `length`, `numeric`) take positional args — pass them as an **array**:\n```json\n{ \"call\": \"lte\", \"args\": [{ \"path\": \"/formData/dob\" }, { \"call\": \"now\" }] }\n{ \"call\": \"and\", \"args\": [{ \"call\": \"required\", \"args\": { \"value\": { \"path\": \"/a\" } } }, { \"call\": \"required\", \"args\": { \"value\": { \"path\": \"/b\" } } }] }\n```",
   "catalogId": "https://freesail.dev/catalogs/standard_catalog_v1.json",
   "components": {
     "Text": {

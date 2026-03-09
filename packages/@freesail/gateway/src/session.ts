@@ -12,8 +12,10 @@ import {
   type UpstreamMessage,
   type A2UIClientCapabilities,
 } from '@freesail/core';
+import { writeFileSync, existsSync, statSync } from 'fs';
+import { join } from 'path';
 import { logger } from '@freesail/logger';
-import type { Catalog } from './converter.js';
+import { generateCatalogPrompt, type Catalog } from './converter.js';
 
 /**
  * Represents a connected client session.
@@ -180,6 +182,22 @@ export class SessionManager {
         session.catalogIds.add(catalog.id);
       }
       logger.info(`[SessionManager] Registered catalog: ${catalog.title} (${catalog.id}) for session ${sessionId}`);
+
+      const logDir = process.env['CATALOG_LOG_DIR'];
+      if (logDir) {
+        try {
+          if (!existsSync(logDir) || !statSync(logDir).isDirectory()) {
+            logger.warn(`[SessionManager] CATALOG_LOG_DIR '${logDir}' is not a valid directory — skipping catalog prompt write`);
+          } else {
+            const slug = catalog.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+            const filePath = join(logDir, `${slug}.md`);
+            writeFileSync(filePath, generateCatalogPrompt(catalog), 'utf8');
+            logger.info(`[SessionManager] Wrote catalog prompt to ${filePath}`);
+          }
+        } catch (err) {
+          logger.error(`[SessionManager] Failed to write catalog prompt for '${catalog.title}':`, err);
+        }
+      }
     }
     // Notify listeners
     for (const listener of this.catalogListeners) {

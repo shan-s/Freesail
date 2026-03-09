@@ -179,10 +179,24 @@ export const isEmpty: FunctionImplementation = (value: unknown) => {
 
 export const eq: FunctionImplementation = (a: unknown, b: unknown) => a === b;
 export const neq: FunctionImplementation = (a: unknown, b: unknown) => a !== b;
-export const gt: FunctionImplementation = (a: unknown, b: unknown) => Number(a) > Number(b);
-export const gte: FunctionImplementation = (a: unknown, b: unknown) => Number(a) >= Number(b);
-export const lt: FunctionImplementation = (a: unknown, b: unknown) => Number(a) < Number(b);
-export const lte: FunctionImplementation = (a: unknown, b: unknown) => Number(a) <= Number(b);
+
+// Converts a value to a comparable number.
+// Falls back to Date.parse for date/datetime strings so that comparisons
+// like lte("2026-03-02", "2026-03-08T00:00:00Z") work correctly.
+function toComparable(v: unknown): number {
+  if (typeof v === 'string') {
+    const n = Number(v);
+    if (!isNaN(n)) return n;
+    const ts = Date.parse(v);
+    if (!isNaN(ts)) return ts;
+  }
+  return Number(v);
+}
+
+export const gt:  FunctionImplementation = (a: unknown, b: unknown) => toComparable(a) >  toComparable(b);
+export const gte: FunctionImplementation = (a: unknown, b: unknown) => toComparable(a) >= toComparable(b);
+export const lt:  FunctionImplementation = (a: unknown, b: unknown) => toComparable(a) <  toComparable(b);
+export const lte: FunctionImplementation = (a: unknown, b: unknown) => toComparable(a) <= toComparable(b);
 
 export const now: FunctionImplementation = () => new Date().toISOString();
 
