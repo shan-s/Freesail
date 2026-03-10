@@ -191,6 +191,38 @@
         }
       ],
       "unevaluatedProperties": false
+    },
+    "AgentStream": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "const": "AgentStream"
+            },
+            "token": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Latest token emitted by the agent. The component appends each new value to its internal buffer and renders the accumulated text."
+            },
+            "active": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "Whether the stream is currently active. When set to false the component freezes its buffer.",
+              "default": false
+            }
+          },
+          "required": [
+            "component"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
     }
   }
 }

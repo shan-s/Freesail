@@ -13,11 +13,27 @@ import type { FreesailComponentProps } from '@freesail/react';
 // =============================================================================
 
 /**
- * Top-level chat layout — header + scrollable messages + input.
+ * Top-level chat layout — header + scrollable content + fixed input.
+ *
+ * The last child is treated as the fixed footer (ChatInput).
+ * All preceding children (messages, AgentStream, typing indicator) are
+ * placed inside a single scrollable wrapper with auto-scroll.
  */
 export function ChatContainer({ component, children }: FreesailComponentProps) {
   const height = (component['height'] as string) ?? '100%';
   const title = component['title'] as string | undefined;
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const childArray = React.Children.toArray(children);
+  const fixedBottom = childArray.length > 1 ? childArray[childArray.length - 1] : null;
+  const scrollableContent = childArray.length > 1 ? childArray.slice(0, -1) : childArray;
+
+  // Auto-scroll to bottom whenever scrollable content changes
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  });
 
   const style: CSSProperties = {
     display: 'flex',
@@ -28,6 +44,12 @@ export function ChatContainer({ component, children }: FreesailComponentProps) {
     fontFamily: 'system-ui, -apple-system, sans-serif',
     backgroundColor: 'var(--freesail-bg-root, #ffffff)',
     borderRight: '1px solid var(--freesail-border, #e2e8f0)',
+  };
+
+  const scrollStyle: CSSProperties = {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
   };
 
   return (
@@ -43,7 +65,10 @@ export function ChatContainer({ component, children }: FreesailComponentProps) {
           {title}
         </div>
       )}
-      {children}
+      <div ref={scrollRef} style={scrollStyle}>
+        {scrollableContent}
+      </div>
+      {fixedBottom}
     </div>
   );
 }
@@ -53,21 +78,10 @@ export function ChatContainer({ component, children }: FreesailComponentProps) {
 // =============================================================================
 
 /**
- * Scrollable message list with auto-scroll to bottom.
+ * Message list container. Scroll is managed by the parent ChatContainer.
  */
 export function ChatMessageList({ children }: FreesailComponentProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  });
-
   const style: CSSProperties = {
-    flex: 1,
-    minHeight: 0,
-    overflowY: 'auto',
     padding: '16px',
     display: 'flex',
     flexDirection: 'column',
@@ -77,7 +91,7 @@ export function ChatMessageList({ children }: FreesailComponentProps) {
   const hasChildren = React.Children.count(children) > 0;
 
   return (
-    <div ref={containerRef} style={style}>
+    <div style={style}>
       {hasChildren ? children : (
         <div style={{ color: 'var(--freesail-text-muted, #64748b)', textAlign: 'center', marginTop: '40px' }}>
           <p>Ask the agent to create UI components!</p>
@@ -303,6 +317,72 @@ function Dot({ delay }: { delay: number }) {
 }
 
 // =============================================================================
+// AgentStream
+// =============================================================================
+
+/**
+ * Streaming token accumulator.
+ *
+ * The agent writes individual tokens to `/stream/token` via
+ * `update_data_model`. This component appends each new token value to an
+ * internal buffer and renders the accumulated text as an assistant message
+ * bubble. When `active` transitions to `false` the buffer is frozen (the
+ * canonical message is committed to `/messages` by the full-state update).
+ */
+export function AgentStream({ component }: FreesailComponentProps) {
+  const active = (component['active'] as boolean) ?? false;
+  const token = (component['token'] as string) ?? '';
+
+  const bufferRef = useRef('');
+  const prevTokenRef = useRef('');
+  const [display, setDisplay] = useState('');
+
+  // Append whenever a new token value arrives while active
+  useEffect(() => {
+    if (!active) {
+      // Stream ended — clear buffer for next round
+      bufferRef.current = '';
+      prevTokenRef.current = '';
+      setDisplay('');
+      return;
+    }
+
+    if (token && token !== prevTokenRef.current) {
+      prevTokenRef.current = token;
+      bufferRef.current += token;
+      setDisplay(bufferRef.current);
+    }
+  }, [token, active]);
+
+  if (!active && !display) return null;
+
+  const containerStyle: CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  };
+
+  const bubbleStyle: CSSProperties = {
+    maxWidth: '85%',
+    padding: '10px 14px',
+    borderRadius: 'var(--freesail-radius-lg) var(--freesail-radius-lg) var(--freesail-radius-lg) 4px',
+    backgroundColor: 'var(--freesail-bg-muted, #f8fafc)',
+    color: 'var(--freesail-text-main, #0f172a)',
+    fontSize: '14px',
+    lineHeight: '1.5',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+    boxShadow: 'var(--freesail-shadow-sm)',
+  };
+
+  return (
+    <div style={containerStyle}>
+      <div style={bubbleStyle}>{display}</div>
+    </div>
+  );
+}
+
+// =============================================================================
 // Component Map Export
 // =============================================================================
 
@@ -315,4 +395,5 @@ export const chatCatalogComponents: Record<string, React.ComponentType<FreesailC
   ChatMessage,
   ChatInput,
   ChatTypingIndicator,
+  AgentStream,
 };

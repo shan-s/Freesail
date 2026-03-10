@@ -162,7 +162,7 @@ function ChatBootstrapper() {
         component: 'ChatContainer',
         title: 'Chat with AI Agent',
         height: '100%',
-        children: ['message_list', 'typing', 'chat_input'],
+        children: ['message_list', 'agent_stream', 'typing', 'chat_input'],
       },
       {
         id: 'message_list',
@@ -179,6 +179,12 @@ function ChatBootstrapper() {
         timestamp: { path: 'timestamp' },
       },
       {
+        id: 'agent_stream',
+        component: 'AgentStream',
+        token: { path: '/stream/token' },
+        active: { path: '/stream/active' },
+      },
+      {
         id: 'typing',
         component: 'ChatTypingIndicator',
         visible: { path: '/isTyping' },
@@ -192,7 +198,7 @@ function ChatBootstrapper() {
     ]);
 
     // 3. Set initial data model
-    surfaceManager.updateDataModel('__chat', '/', { messages: [], isTyping: false });
+    surfaceManager.updateDataModel('__chat', '/', { messages: [], isTyping: false, stream: { token: '', active: false } });
   }, [surfaceManager]);
 
   return null;

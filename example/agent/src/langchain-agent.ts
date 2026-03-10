@@ -124,16 +124,14 @@ export class FreesailLangchainSessionAgent implements FreesailAgent {
         this.chatMessages.push({ role: 'user', content: message, timestamp: new Date().toISOString() });
       }
 
-      const assistantIndex = this.chatMessages.length;
-      this.chatMessages.push({ role: 'assistant', content: '', timestamp: new Date().toISOString() });
-
+      // Full update: show user message + activate AgentStream
       await this.mcpClient.callTool({
         name: 'update_data_model',
         arguments: {
           surfaceId: '__chat',
           sessionId: this.sessionId,
           path: '/',
-          value: { messages: [...this.chatMessages], isTyping: true },
+          value: { messages: [...this.chatMessages], isTyping: true, stream: { token: '', active: true } },
         },
       });
 
@@ -148,25 +146,22 @@ export class FreesailLangchainSessionAgent implements FreesailAgent {
 
       const response = await this.chat(sessionPrompt, {
         onToken: (token: string) => {
-          const current = this.chatMessages[assistantIndex];
-          if (current) current.content += token;
+          // Lightweight per-token update — AgentStream appends client-side
           this.mcpClient.callTool({
             name: 'update_data_model',
             arguments: {
               surfaceId: '__chat',
               sessionId: this.sessionId,
-              path: `/messages/${assistantIndex}/content`,
-              value: this.chatMessages[assistantIndex]?.content ?? '',
+              path: '/stream/token',
+              value: token,
             },
           }).catch(err => logger.error('Streaming update error', err));
         },
       });
 
-      const current = this.chatMessages[assistantIndex];
+      // Stream complete — commit final assistant message, deactivate AgentStream
       if (response && response.trim() !== '') {
-        if (current) current.content = response;
-      } else {
-        this.chatMessages.splice(assistantIndex, 1);
+        this.chatMessages.push({ role: 'assistant', content: response, timestamp: new Date().toISOString() });
       }
 
       logger.info(`[${this.sessionId}] Assistant: ${response?.slice(0, 120)}...`);
@@ -177,13 +172,11 @@ export class FreesailLangchainSessionAgent implements FreesailAgent {
           surfaceId: '__chat',
           sessionId: this.sessionId,
           path: '/',
-          value: { messages: [...this.chatMessages], isTyping: false },
+          value: { messages: [...this.chatMessages], isTyping: false, stream: { token: '', active: false } },
         },
       });
     } catch (error) {
       logger.error(`[${this.sessionId}] Chat error:`, error);
-      const lastMsg = this.chatMessages[this.chatMessages.length - 1];
-      if (lastMsg && lastMsg.content === '') this.chatMessages.pop();
       this.chatMessages.push({ role: 'assistant', content: 'An error occurred.', timestamp: new Date().toISOString() });
       await this.mcpClient.callTool({
         name: 'update_data_model',
@@ -191,7 +184,7 @@ export class FreesailLangchainSessionAgent implements FreesailAgent {
           surfaceId: '__chat',
           sessionId: this.sessionId,
           path: '/',
-          value: { messages: [...this.chatMessages], isTyping: false },
+          value: { messages: [...this.chatMessages], isTyping: false, stream: { token: '', active: false } },
         },
       });
     }
