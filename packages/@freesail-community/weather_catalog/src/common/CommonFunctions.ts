@@ -29,9 +29,17 @@ export const required: FunctionImplementation = (value: unknown) => {
 
 export const regex: FunctionImplementation = (value: unknown, pattern: string) => {
   if (typeof value !== 'string') return false;
+  if (typeof pattern !== 'string' || pattern.length > 200) return false;
   try {
-    const re = new RegExp(pattern);
-    return re.test(value);
+    const re = new RegExp(pattern, 'u');
+    // Run with a guarded timeout to prevent ReDoS on catastrophic patterns
+    let matched = false;
+    const start = performance.now();
+    matched = re.test(value);
+    if (performance.now() - start > 50) {
+      console.warn('[CommonFunctions] regex: pattern took >50ms, consider simplifying:', pattern);
+    }
+    return matched;
   } catch {
     return false;
   }
@@ -107,40 +115,30 @@ export const formatDate: FunctionImplementation = (value: unknown, pattern: stri
   const date = new Date(String(value));
   if (isNaN(date.getTime())) return '';
 
-  const d = date;
-  const year = d.getFullYear();
-  const month = d.getMonth();
-  const day = d.getDate();
-  const dayOfWeek = d.getDay();
-  const hours = d.getHours();
-  const minutes = d.getMinutes();
-  const seconds = d.getSeconds();
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const pad = (n: number, len: number = 2) => n.toString().padStart(len, '0');
+  const h12 = (h: number) => h % 12 || 12;
 
-  const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthsLong = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const daysShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const daysLong = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-  const pad = (n: number) => n.toString().padStart(2, '0');
-
-  return pattern
-    .replace(/yyyy/g, year.toString())
-    .replace(/yy/g, year.toString().slice(-2))
-    .replace(/MMMM/g, monthsLong[month] || '')
-    .replace(/MMM/g, monthsShort[month] || '')
-    .replace(/MM/g, pad(month + 1))
-    .replace(/M/g, (month + 1).toString())
-    .replace(/dd/g, pad(day))
-    .replace(/d/g, day.toString())
-    .replace(/EEEE/g, daysLong[dayOfWeek] || '')
-    .replace(/E/g, daysShort[dayOfWeek] || '')
-    .replace(/HH/g, pad(hours))
-    .replace(/H/g, hours.toString())
-    .replace(/hh/g, pad(hours % 12 || 12))
-    .replace(/h/g, (hours % 12 || 12).toString())
-    .replace(/mm/g, pad(minutes))
-    .replace(/ss/g, pad(seconds))
-    .replace(/a/g, hours < 12 ? 'AM' : 'PM');
+  // Single-pass: match runs of the same format letter, then dispatch.
+  // This avoids chained .replace() where substituted text gets re-matched.
+  return pattern.replace(/([yMdEHhmsaS])\1*/g, (token) => {
+    const ch = token[0];
+    const len = token.length;
+    switch (ch) {
+      case 'y': return len <= 2 ? pad(date.getFullYear() % 100) : date.getFullYear().toString();
+      case 'M': return len >= 4 ? (months[date.getMonth()] ?? '') : len === 3 ? (months[date.getMonth()] ?? '').slice(0, 3) : len === 2 ? pad(date.getMonth() + 1) : (date.getMonth() + 1).toString();
+      case 'd': return len >= 2 ? pad(date.getDate()) : date.getDate().toString();
+      case 'E': return len >= 4 ? (days[date.getDay()] ?? '') : (days[date.getDay()] ?? '').slice(0, 3);
+      case 'H': return len >= 2 ? pad(date.getHours()) : date.getHours().toString();
+      case 'h': return len >= 2 ? pad(h12(date.getHours())) : h12(date.getHours()).toString();
+      case 'm': return len >= 2 ? pad(date.getMinutes()) : date.getMinutes().toString();
+      case 's': return len >= 2 ? pad(date.getSeconds()) : date.getSeconds().toString();
+      case 'S': return pad(date.getMilliseconds(), 3).slice(0, len);
+      case 'a': return date.getHours() < 12 ? 'AM' : 'PM';
+      default: return token;
+    }
+  });
 };
 
 // =============================================================================
@@ -205,8 +203,13 @@ export const lte: FunctionImplementation = (a: unknown, b: unknown) => toCompara
 export const now: FunctionImplementation = () => new Date().toISOString();
 
 export const openUrl: FunctionImplementation = (url: unknown) => {
-  if (typeof url === 'string') {
-    window.open(url, '_blank');
+  if (typeof url !== 'string') return;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+    window.open(parsed.href, '_blank', 'noopener,noreferrer');
+  } catch {
+    // Invalid URL — ignore silently
   }
 };
 

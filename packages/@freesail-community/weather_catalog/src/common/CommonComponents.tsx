@@ -161,16 +161,6 @@ export function Text({ component }: FreesailComponentProps) {
 
   const variant = (component['variant'] as string) ?? 'body';
 
-  if (text.startsWith('# ')) {
-    return <h1 style={{ ...style, fontSize: '2em', fontWeight: 'bold' }}>{text.slice(2)}</h1>;
-  }
-  if (text.startsWith('## ')) {
-    return <h2 style={{ ...style, fontSize: '1.5em', fontWeight: 'bold' }}>{text.slice(3)}</h2>;
-  }
-  if (text.startsWith('### ')) {
-    return <h3 style={{ ...style, fontSize: '1.17em', fontWeight: 'bold' }}>{text.slice(4)}</h3>;
-  }
-
   switch (variant) {
     case 'h1':
       return <h1 style={{ ...style, fontSize: '2em', fontWeight: 'bold' }}>{text}</h1>;
@@ -182,6 +172,16 @@ export function Text({ component }: FreesailComponentProps) {
     case 'label':
       return <label style={{ ...style, fontWeight: '500', fontSize: '12px' }}>{text}</label>;
     default:
+      // Fallback: detect markdown-style heading prefixes only when no explicit variant
+      if (text.startsWith('# ')) {
+        return <h1 style={{ ...style, fontSize: '2em', fontWeight: 'bold' }}>{text.slice(2)}</h1>;
+      }
+      if (text.startsWith('## ')) {
+        return <h2 style={{ ...style, fontSize: '1.5em', fontWeight: 'bold' }}>{text.slice(3)}</h2>;
+      }
+      if (text.startsWith('### ')) {
+        return <h3 style={{ ...style, fontSize: '1.17em', fontWeight: 'bold' }}>{text.slice(4)}</h3>;
+      }
       return <span style={style}>{text}</span>;
   }
 }
@@ -531,7 +531,8 @@ export function ChoicePicker({ component, onDataChange }: FreesailComponentProps
 
   const [localValue, setLocalValue] = useState(value);
 
-  useEffect(() => { setLocalValue(value); }, [value]);
+  const valueKey = JSON.stringify(value);
+  useEffect(() => { setLocalValue(value); }, [valueKey]);
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newValue = [e.target.value];
@@ -642,8 +643,26 @@ export function Spacer({ component }: FreesailComponentProps) {
 export function Modal({ component, children }: FreesailComponentProps) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerVariant = (component['triggerVariant'] as string) ?? 'click';
+  const modalRef = React.useRef<HTMLDivElement>(null);
 
   const [trigger, content] = React.Children.toArray(children);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  // Focus the modal content when opened
+  useEffect(() => {
+    if (isOpen && modalRef.current) {
+      modalRef.current.focus();
+    }
+  }, [isOpen]);
 
   const modalOverlayStyle: CSSProperties = {
     position: 'fixed',
@@ -690,9 +709,9 @@ export function Modal({ component, children }: FreesailComponentProps) {
       </div>
 
       {isOpen && (
-        <div style={modalOverlayStyle} onClick={() => setIsOpen(false)}>
-          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-            <button style={closeButtonStyle} onClick={() => setIsOpen(false)}>
+        <div style={modalOverlayStyle} onClick={() => setIsOpen(false)} role="dialog" aria-modal="true">
+          <div ref={modalRef} style={modalContentStyle} onClick={(e) => e.stopPropagation()} tabIndex={-1}>
+            <button style={closeButtonStyle} onClick={() => setIsOpen(false)} aria-label="Close">
               &times;
             </button>
             {content}

@@ -11,6 +11,25 @@ import ReactMarkdown from 'react-markdown';
 import type { FreesailComponentProps } from '@freesail/react';
 import { commonComponents, getSemanticColor, validateChecks } from '../common/CommonComponents.js';
 
+/** Sanitize a string for safe use in CSS class names / values. */
+function sanitizeCssIdent(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function sanitizeCssValue(value: string): string {
+  return value.replace(/[;{}"'<>\\]/g, '');
+}
+
+/** Check that a URL is safe for use in src attributes (http/https only). */
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 // =============================================================================
 // Layout Components
 // =============================================================================
@@ -30,8 +49,8 @@ export function GridLayout({ component, children }: FreesailComponentProps) {
   const childArray = Array.isArray(children) ? children : children ? [children] : [];
 
   // Unique class scoped to this grid instance for CSS targeting
-  const gridClass = `freesail-grid-${component['id'] ?? 'default'}`;
-  const rowPadding = (component['rowPadding'] as string) ?? '10px 16px';
+  const gridClass = `freesail-grid-${sanitizeCssIdent(String(component['id'] ?? 'default'))}`;
+  const rowPadding = sanitizeCssValue((component['rowPadding'] as string) ?? '10px 16px');
 
   const wrapperStyle: CSSProperties = {
     width: '100%',
@@ -188,6 +207,10 @@ export function Image({ component }: FreesailComponentProps) {
   const src = String((component['src'] as string) ?? (component['url'] as string) ?? '');
   const alt = String((component['alt'] as string) ?? '');
 
+  if (!isSafeUrl(src)) {
+    return <div style={{ color: 'var(--freesail-text-muted, #64748b)', fontSize: '14px' }}>Invalid image URL</div>;
+  }
+
   const style: CSSProperties = {
     maxWidth: '100%',
     height: 'auto',
@@ -268,18 +291,31 @@ export function Tabs({ component, children }: FreesailComponentProps) {
 
   return (
     <div>
-      <div style={tabBarStyle}>
+      <div style={tabBarStyle} role="tablist">
         {tabs.map((tab, index) => (
           <div
             key={index}
+            role="tab"
+            tabIndex={index === activeTab ? 0 : -1}
+            aria-selected={index === activeTab}
             style={tabStyle(index === activeTab)}
             onClick={() => setActiveTab(index)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setActiveTab(index);
+              } else if (e.key === 'ArrowRight') {
+                setActiveTab((index + 1) % tabs.length);
+              } else if (e.key === 'ArrowLeft') {
+                setActiveTab((index - 1 + tabs.length) % tabs.length);
+              }
+            }}
           >
             {tab.title}
           </div>
         ))}
       </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0 }} role="tabpanel">
         {React.Children.toArray(children)[activeTab]}
       </div>
     </div>
@@ -337,16 +373,23 @@ export function Video({ component }: FreesailComponentProps) {
     }
 
     // Generic iframe fallback for other embed URLs
+    if (!isSafeUrl(url)) {
+      return <div style={{ color: 'var(--freesail-text-muted, #64748b)', fontSize: '14px' }}>Invalid video URL</div>;
+    }
     return (
       <iframe
         src={url}
         style={{ ...style, width: '100%', aspectRatio: '16 / 9', border: 'none' }}
         allowFullScreen
+        sandbox="allow-scripts allow-same-origin"
       />
     );
   }
 
   // Native <video> for direct file URLs (mp4, webm, etc.)
+  if (!isSafeUrl(url)) {
+    return <div style={{ color: 'var(--freesail-text-muted, #64748b)', fontSize: '14px' }}>Invalid video URL</div>;
+  }
   return <video src={url} controls style={style} />;
 }
 
@@ -398,6 +441,9 @@ export function AudioPlayer({ component }: FreesailComponentProps) {
     }
 
     // Generic iframe fallback for other embed URLs
+    if (!isSafeUrl(url)) {
+      return <div style={{ color: 'var(--freesail-text-muted, #64748b)', fontSize: '14px' }}>Invalid audio URL</div>;
+    }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
         {descriptionEl}
@@ -405,12 +451,16 @@ export function AudioPlayer({ component }: FreesailComponentProps) {
           src={url}
           style={{ width: '100%', height: '166px', border: 'none', borderRadius: '12px' }}
           allow="autoplay"
+          sandbox="allow-scripts allow-same-origin"
         />
       </div>
     );
   }
 
   // Fallback: native <audio> for direct file URLs (mp3, wav, ogg, etc.)
+  if (!isSafeUrl(url)) {
+    return <div style={{ color: 'var(--freesail-text-muted, #64748b)', fontSize: '14px' }}>Invalid audio URL</div>;
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
       {descriptionEl}

@@ -247,8 +247,7 @@ function generateReadme(prefix: string, title: string, description: string): str
 
 export async function run(): Promise<void> {
   console.log('--- Freesail New Catalog ---\n');
-  console.log('This will scaffold a new catalog using the fork-and-own model.');
-  console.log('Common components and functions will be copied into your catalog.\n');
+  console.log('This will scaffold a new catalog. Common components and functions will be copied into your catalog.\n');
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
 
