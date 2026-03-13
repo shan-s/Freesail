@@ -15,6 +15,9 @@ export default defineConfig([
     format: ['cjs'],
     dts: false,
     clean: false,
+    loader: {
+      '.md': 'text',
+    },
     banner: {
       js: '#!/usr/bin/env node',
     },

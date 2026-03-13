@@ -68,7 +68,7 @@ await mcpClient.connect(
 
 const runtime = new FreesailAgentRuntime({
   mcpClient,
-  agentId: "my-agent", // must match the ID claimed in the gateway
+  agentId: "my-agent", // optional — auto-generated UUID if omitted
   agentFactory: (sessionId) => new MyAgent(sessionId),
 });
 
@@ -116,27 +116,30 @@ interface ActionEvent {
 ```typescript
 interface AgentRuntimeConfig {
   mcpClient: Client;
-  agentId: string; // scopes get_all_pending_actions to this agent's sessions
+  agentId?: string; // optional — a random UUID is generated if omitted
   agentFactory: AgentFactory; // (sessionId: string) => FreesailAgent
 }
 ```
 
-> **`agentId` is required.** It scopes `get_all_pending_actions` to sessions owned by this agent, preventing one agent from draining another agent's action queue.
+> **`agentId`** identifies the runtime instance when calling `claim_session` and `release_session` on the gateway. If omitted, a random UUID is generated at startup. Set it explicitly in multi-agent deployments so sessions are identifiable in `list_sessions` output.
 
 ---
 
 ## Session lifecycle guarantees
 
 ```
-__session_connected  → onSessionConnected()
+__session_connected  → claim_session(agentId, sessionId)
+                     → onSessionConnected()
                          ↓
 onAction() calls ... (fire-and-forget, tracked per session)
                          ↓
 __session_disconnected → drain all in-flight onAction promises
                        → onSessionDisconnected()
+                       → release_session(agentId, sessionId)
                        → agent instance GC'd
 ```
 
+- **Session ownership**: the runtime calls `claim_session` when a session connects and `release_session` when it disconnects. This lets the gateway track which agent owns each session.
 - **Ordering**: lifecycle events for the same session are serialised via a per-session promise chain. Events across different sessions run concurrently.
 - **Drain on disconnect**: `onSessionDisconnected` is never called while an `onAction` LLM call is still running for that session. The runtime waits using `Promise.allSettled`.
 - **Missed connect**: if a `__session_connected` event is missed (e.g. the agent process restarted), the runtime will create a new agent instance on the first action it sees for that session. `onSessionConnected` will not be called in this case.
@@ -145,7 +148,7 @@ __session_disconnected → drain all in-flight onAction promises
 
 ## Shared cache
 
-Use `SharedCache` when multiple session agents share expensive MCP-fetched data (system prompt, tool definitions) that doesn't change per session.
+Use `SharedCache<TTools>` when multiple session agents share expensive MCP-fetched data (system prompt, tool definitions) that doesn't change per session. The `TTools` generic lets any agent framework (LangChain, Vercel AI SDK, etc.) share a single fetched tool list without coupling to a particular SDK.
 
 ```typescript
 import { SharedCache } from "@freesail/agentruntime";
@@ -154,6 +157,7 @@ import { SharedCache } from "@freesail/agentruntime";
 const cache = new SharedCache(
   mcpClient,
   () => myFramework.getTools(mcpClient), // called at most once until invalidated
+  // optional third arg: systemPromptOverride — use a hardcoded prompt instead of fetching from MCP
 );
 
 // In each session agent:
@@ -180,6 +184,27 @@ Fetches the `a2ui_system` prompt from the gateway. Returns a default fallback if
 import { fetchFreesailSystemPrompt } from '@freesail/agentruntime';
 
 const prompt = await fetchFreesailSystemPrompt(mcpClient);
+```
+
+### `listCatalogResources(mcpClient)`
+
+Lists all MCP resources (catalogs, files, etc.) registered on the gateway. Returns an array of `McpResourceEntry` objects, or an empty array on failure.
+
+```typescript
+import { listCatalogResources } from '@freesail/agentruntime';
+
+const resources = await listCatalogResources(mcpClient);
+// [{ uri, name, mimeType?, description? }, ...]
+```
+
+### `readCatalogResource(mcpClient, uri)`
+
+Reads the content of a single MCP resource by URI (e.g. a catalog definition). Throws on failure so the error can be surfaced to the LLM.
+
+```typescript
+import { readCatalogResource } from '@freesail/agentruntime';
+
+const content = await readCatalogResource(mcpClient, 'catalog://my-catalog');
 ```
 
 ### Catalog discovery via `get_catalogs`

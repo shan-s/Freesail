@@ -91,22 +91,55 @@ When a surface is created with `sendDataModel: true`, the client includes the fu
   * parser.ts: logic to parse incoming JSON streams and handle partial chunks.  
   * transport.ts: The SSE Client implementation with auto-reconnect and offline queueing.
 
+### **/packages/catalogs**
+
+* **Purpose:** First-party catalog definitions shipped with Freesail.  
+* **Key Files:**  
+  * standard\_catalog/: Core UI components (Text, Icon, Row, Column, Card, Button, Input, etc.).  
+  * chat\_catalog/: Chat-specific components.  
+  * common/: Shared types and helpers used across catalogs.  
+  * schemas/: JSON schema definitions for catalog validation.
+
+### **/packages/agentruntime**
+
+* **Purpose:** Utilities for building agents that interact with Freesail.  
+* **Key Files:**  
+  * runtime.ts: Agent runtime logic (event loop, tool dispatch).  
+  * formatter.ts: Message formatting helpers.  
+  * schema.ts: Schema utilities for catalog/tool introspection.  
+  * shared-cache.ts: Caching layer for session and catalog data.  
+  * types.ts: TypeScript type definitions.
+
 ### **/packages/react**
 
 * **Purpose:** The React implementation of the Renderer.  
 * **Key Files:**  
-  * catalogs/: The folder containing catalog.json and the corresponding React components.  
-  * components/FreesailSurface.tsx: The main container component that users drop into their app.  
-  * hooks/useFreesail.ts: Hooks for accessing the data model state.
+  * FreesailSurface.tsx: The main container component that users drop into their app.  
+  * FreesailProvider.tsx: React context provider that connects to the Freesail Gateway.  
+  * hooks.ts: Hooks for interacting with surfaces and data (`useSurface`, `useSurfaceData`, `useFreesailContext`).  
+  * registry.ts: Maps catalog component names to React components via `withCatalog()`.  
+  * context.ts: Internal React context definitions.  
+  * theme.tsx: Theming support.
 
 ### **/packages/gateway**
 
 * **Purpose:** The Node.js server that bridges Agents and Clients.  
 * **Key Files:**  
-  * mcp.ts: The MCP Server implementation defining tools like create\_surface.  
+  * mcp.ts: The MCP Server implementation registering the following tools:  
+    * `create_surface` — Initialize a new UI surface for a client session.  
+    * `update_components` — Update the component tree of a surface.  
+    * `update_data_model` — Update the data model without changing component structure.  
+    * `delete_surface` — Remove a surface from the UI.  
+    * `get_catalogs` — Get the catalogs supported by a client session.  
+    * `get_pending_actions` — Drain pending user actions from a specific session.  
+    * `get_all_pending_actions` — Drain pending actions across all (or agent-claimed) sessions.  
+    * `list_sessions` — List sessions owned by an agent with surface and action details.  
+    * `claim_session` — Claim a client session for an agent.  
+    * `release_session` — Release an agent's claim on a session.  
   * express.ts: The HTTP server handling the SSE stream for the browser.  
   * session.ts: Client session management with capability storage.  
-  * converter.ts: Logic to convert catalog.json into MCP Tool schemas.
+  * converter.ts: Logic to convert catalog.json into MCP Tool schemas.  
+  * cli.ts: CLI entry point with configurable `--mcp-port` (default 3000) and `--http-port` (default 3001).
 
 ## **5\. Key Engineering Concepts**
 
@@ -116,7 +149,7 @@ We do not write code first. We write the **Contract** (catalog.json) first.
 
 1. Define a component (e.g., Ticker) in catalog.json.  
 2. The Agent *immediately* sees a new tool: render\_ticker.  
-3. The React Developer implements Ticker.tsx using withCatalog(catalog, 'Ticker').  
+3. The React Developer implements Ticker.tsx using `withCatalog(catalogId, 'Ticker', TickerComponent)`.  
    This ensures the Agent and the UI never drift out of sync.
 
 ### **Stateless Agent / Stateful Client**

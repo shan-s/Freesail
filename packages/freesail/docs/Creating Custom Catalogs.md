@@ -17,32 +17,64 @@ This scaffolds a complete catalog with all common components and functions pre-p
   package.json
   tsconfig.json
   src/
-    {name}_catalog.json   # Full component + function schema
-    components.tsx         # Your custom components + common imports
-    functions.ts           # Your custom functions + common imports
-    index.ts               # Exports CatalogDefinition
-    CommonComponents.tsx   # Common component implementations (yours to modify)
-    CommonFunctions.ts     # Common function implementations (yours to modify)
-    common_types.json      # Shared A2UI type definitions
+    {name}_catalog.json      # Generated — full resolved catalog (do not edit directly)
+    catalog.exclude.json      # List components/functions to exclude from the catalog
+    components.json           # Your custom component schemas
+    functions.json            # Your custom function schemas
+    components.tsx            # Your custom components + common imports
+    functions.ts              # Your custom functions + common imports
+    index.ts                  # Exports CatalogDefinition
+    common/
+      CommonComponents.tsx    # Common component implementations (yours to modify)
+      CommonFunctions.ts      # Common function implementations (yours to modify)
+      common_components.json  # Common component schemas
+      common_functions.json   # Common function schemas
+      common_types.json       # Shared A2UI type definitions
+    schemas/
+      catalog-schema.json     # JSON Schema for catalog validation
 ```
 
-The common files (`CommonComponents.tsx`, `CommonFunctions.ts`, `common_types.json`) are copied from `@freesail/catalogs` at scaffold time. They form the baseline every agent relies on. You can modify them, but `formatString` must always exist.
+The common files under `src/common/` are copied from `@freesail/catalogs` at scaffold time. They form the baseline every agent relies on. You can modify them, but `formatString` must always exist.
+
+### Catalog ID
+
+The `catalogId` in the generated catalog JSON is derived from the npm package name's org scope:
+
+- `@acme/weather_catalog` → `https://acme.local/catalogs/weather_catalog_v1.json`
+- `@sloop-3f2a1c/my_catalog` → `https://sloop-3f2a1c.local/catalogs/my_catalog_v1.json`
+
+During scaffolding, a random boat-type scope is generated as a default (e.g. `@catamaran-4f8a2c`). You can accept it or type your own org name. Replace the `.local` domain with a real one before publishing.
+
+No `freesail` block is needed in `package.json` — the `catalogId`, `title`, and `description` are all derived automatically. You can add a `freesail` block to override them if needed.
+
+### Build Pipeline
+
+The generated `package.json` includes:
+
+```json
+{
+  "scripts": {
+    "prepare:catalog": "freesail prepare catalog",
+    "prebuild": "freesail prepare catalog && freesail validate catalog",
+    "build": "tsc"
+  }
+}
+```
+
+- **`freesail prepare catalog`** — merges common and custom schemas, applies exclusions, and writes `{name}_catalog.json`
+- **`freesail validate catalog`** — checks that every JSON-declared component/function has a matching implementation
+
+Both run automatically before each `npm run build`.
 
 ---
 
-## Step 1: Define the Schema (`{name}_catalog.json`)
+## Step 1: Define Custom Schemas
 
-The schema is a JSON file that tells the agent which components exist and what properties each one accepts. The gateway uses it to validate agent output before it reaches the browser.
-
-The scaffolded file already includes all 11 common components (Text, Button, Row, Column, Card, etc.) and 22 common functions. Add your custom components alongside them:
+Add custom component schemas in `src/components.json`:
 
 ```json
 {
   "components": {
-    "Text": { "..." },
-    "Button": { "..." },
-    "...all common components...",
-
     "StatusCard": {
       "type": "object",
       "allOf": [
@@ -65,24 +97,56 @@ The scaffolded file already includes all 11 common components (Text, Button, Row
         }
       ]
     }
-  },
-  "functions": [
-    "...all common functions...",
-    {
-      "name": "truncate",
-      "description": "Truncates a string to maxLength characters.",
-      "returnType": "string",
-      "parameters": { "..." }
-    }
-  ]
+  }
 }
 ```
 
+Add custom function schemas in `src/functions.json`:
+
+```json
+{
+  "functions": {
+    "truncate": {
+      "description": "Truncates a string to maxLength characters.",
+      "returnType": "string",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "value": { "type": "string" },
+          "maxLength": { "type": "integer" }
+        },
+        "required": ["value"]
+      }
+    }
+  }
+}
+```
+
+After editing, run `npx freesail prepare catalog` to regenerate the resolved catalog JSON.
+
 **Key rules:**
-- `$id` and `catalogId` must be the same URL. Use a real published URL before shipping; a placeholder is fine during development.
 - `components` keys are the component names agents will use (e.g. `"component": "StatusCard"`).
 - `description` fields are included in the agent's system prompt — write them clearly.
 - Use `allOf` with `ComponentCommon` and `CatalogComponentCommon` for consistent component structure.
+- Do not edit `{name}_catalog.json` directly — it is regenerated by `freesail prepare catalog`.
+
+---
+
+## Excluding Components and Functions
+
+To exclude common components or functions from the final catalog, list them in `src/catalog.exclude.json`:
+
+```json
+{
+  "components": ["Modal", "Spacer"],
+  "functions": ["pluralize", "openUrl"]
+}
+```
+
+Run `npx freesail prepare catalog` after editing. The prepare command will:
+- Remove the listed items from the merged catalog
+- Warn if an exclusion target doesn't exist (typo protection)
+- Warn if the mandatory `formatString` function is excluded
 
 ---
 
@@ -92,7 +156,7 @@ The scaffolded file imports common components and spreads them into the export m
 
 ```tsx
 import type { FreesailComponentProps } from '@freesail/react';
-import { commonComponents } from './CommonComponents.js';
+import { commonComponents } from './common/CommonComponents.js';
 
 export function StatusCard({ component, children }: FreesailComponentProps) {
   const title    = (component['title'] as string) ?? '';
@@ -170,7 +234,7 @@ export function MyInput({ component, onDataChange }: FreesailComponentProps) {
 The common `validateChecks` helper is available from `CommonComponents.tsx`:
 
 ```tsx
-import { commonComponents, validateChecks } from './CommonComponents.js';
+import { commonComponents, validateChecks } from './common/CommonComponents.js';
 
 export function MyInput({ component, onDataChange }: FreesailComponentProps) {
   const checks = (component['checks'] as any[]) ?? [];
@@ -197,7 +261,7 @@ The scaffolded file re-exports common functions. Add custom functions alongside:
 
 ```ts
 import type { FunctionImplementation } from '@freesail/react';
-import { commonFunctions } from './CommonFunctions.js';
+import { commonFunctions } from './common/CommonFunctions.js';
 
 const truncate: FunctionImplementation = {
   execute: (args) => {
@@ -213,7 +277,7 @@ export const myappCatalogFunctions = {
 };
 ```
 
-Remember to also declare the function in the JSON schema (see Step 1).
+Remember to also declare the function in `src/functions.json` (see Step 1).
 
 ---
 
@@ -235,57 +299,34 @@ export const MyappCatalog: CatalogDefinition = {
 };
 ```
 
-> **`formatString` is required.** The agent system prompt relies on it. The `freesail validate catalog` command will error if it is absent from the runtime function map. It's included in `commonFunctions` by default.
-
----
-
-## Step 5: Register with `FreesailProvider`
-
-```tsx
-import { FreesailProvider } from '@freesail/react';
-import { MyappCatalog } from 'myapp-catalog';
-import { StandardCatalog } from '@freesail/catalogs/standard';
-
-function App() {
-  return (
-    <FreesailProvider
-      sseUrl="/api/sse"
-      postUrl="/api/message"
-      catalogDefinitions={[StandardCatalog, MyappCatalog]}
-    >
-      <YourApp />
-    </FreesailProvider>
-  );
-}
-```
-
-Multiple catalogs can coexist. Each surface is bound to exactly one catalog, identified by `catalogId`.
+> **`formatString` is required.** The agent system prompt relies on it. Both `freesail prepare catalog` and `freesail validate catalog` will warn if it is missing from the catalog. It's included in `commonFunctions` by default.
 
 ---
 
 ## Validation
 
-Before building, run:
+The generated `package.json` runs both `freesail prepare catalog` and `freesail validate catalog` before every build. You can also run them manually:
 
 ```bash
-npx freesail validate catalog
+npx freesail prepare catalog   # Merge schemas and apply exclusions
+npx freesail validate catalog   # Check implementations match the schema
 ```
 
-This checks that:
-- Every component key in the JSON schema has a matching entry in the components map.
-- `formatString` is present in the runtime function map.
-- Required schema fields (`catalogId`, `$id`) are set.
-
-The `prebuild` script in the generated `package.json` runs this automatically on every `npm run build`.
+Validation checks:
+- Every component key in the catalog JSON has a matching entry in the components map.
+- Every function key in the catalog JSON has a matching implementation.
+- `formatString` is present in the catalog (warns if missing).
+- Required schema fields (`catalogId`, `title`) are set.
+- Warns if `catalogId` uses a `.local` placeholder domain.
 
 ---
 
 ## Modifying Common Files
 
-Since you own the common files, you can:
-- **Add** properties to existing common components
-- **Remove** components you don't need (delete from JSON schema and component map)
-- **Modify** function behavior (e.g. customize `formatDate` locale handling)
+Since you own the common files in `src/common/`, you can:
+- **Add** properties to existing common components (edit `common_components.json` and `CommonComponents.tsx`)
+- **Exclude** components or functions you don't need (add them to `catalog.exclude.json`)
+- **Modify** function behavior (e.g. customize `formatDate` locale handling in `CommonFunctions.ts`)
 - **Override** theme utilities in `CommonComponents.tsx`
 
 The only hard constraint: **`formatString` must exist** in your function map.

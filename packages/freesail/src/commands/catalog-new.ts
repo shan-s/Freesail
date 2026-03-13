@@ -15,6 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import { createInterface } from 'readline';
 import { prepareCatalog } from './catalog-prepare.js';
+import readmeTemplate from './catalog-readme.md';
 
 // ---------------------------------------------------------------------------
 // Catalog domain generation
@@ -86,16 +87,29 @@ function generateComponentsTsx(prefix: string): string {
  * Extends the common component set with catalog-specific components.
  */
 
+import React, { useState, useEffect, type CSSProperties } from 'react';
 import type { FreesailComponentProps } from '@freesail/react';
-import { commonComponents } from './common/CommonComponents.js';
+import type { FunctionCall } from '@freesail/core';
+import {
+  commonComponents,
+  getSemanticColor,
+  getSemanticBackground,
+  mapJustify,
+  toInputFormat,
+  validateChecks,
+} from './common/CommonComponents.js';
+import { commonFunctions } from './common/CommonFunctions.js';
 
 // Add custom components here, for example:
 //
 // export function MyWidget({ component, children }: FreesailComponentProps) {
-//   return <div>{children}</div>;
+//   const style: CSSProperties = {
+//     color: getSemanticColor(component['color'] as string),
+//   };
+//   return <div style={style}>{children}</div>;
 // }
 
-export const ${camelPrefix}CatalogComponents = {
+export const ${camelPrefix}CatalogComponents: Record<string, React.ComponentType<FreesailComponentProps>> = {
   ...commonComponents,
   // MyWidget,
 };
@@ -111,17 +125,16 @@ function generateFunctionsTs(prefix: string): string {
  * Re-exports all common functions. Add catalog-specific functions below.
  */
 
+import type { FunctionImplementation } from '@freesail/react';
 import { commonFunctions } from './common/CommonFunctions.js';
 
 // Add custom functions here, for example:
 //
-// import type { FunctionImplementation } from '@freesail/react';
-//
-// const myCustomFn: FunctionImplementation = {
-//   execute: (args) => { /* ... */ return result; },
+// const myCustomFn: FunctionImplementation = (value: unknown) => {
+//   return String(value).toUpperCase();
 // };
 
-export const ${camelPrefix}CatalogFunctions = {
+export const ${camelPrefix}CatalogFunctions: Record<string, FunctionImplementation> = {
   ...commonFunctions,
   // myCustomFn,
 };
@@ -215,6 +228,17 @@ function generateTsconfig(): string {
   };
 
   return JSON.stringify(config, null, 2);
+}
+
+function generateReadme(prefix: string, title: string, description: string): string {
+  const camelPrefix = prefix.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+  const pascalPrefix = camelPrefix.charAt(0).toUpperCase() + camelPrefix.slice(1);
+
+  return readmeTemplate
+    .replace(/\{\{title\}\}/g, title)
+    .replace(/\{\{description\}\}/g, description)
+    .replace(/\{\{prefix\}\}/g, prefix)
+    .replace(/\{\{pascalPrefix\}\}/g, pascalPrefix);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,6 +349,9 @@ export async function run(): Promise<void> {
     fs.writeFileSync(path.join(outPath, 'tsconfig.json'), generateTsconfig());
     console.log('   📄 tsconfig.json');
 
+    fs.writeFileSync(path.join(outPath, 'README.md'), generateReadme(prefix, title, description));
+    console.log('   📄 README.md');
+
     // Generate resolved catalog JSON via prepare
     console.log('');
     prepareCatalog({
@@ -343,8 +370,8 @@ export async function run(): Promise<void> {
     console.log(`  and define their schemas in src/components.json`);
     console.log('Add custom functions in src/functions.ts');
     console.log(`  and define their schemas in src/functions.json`);
-    console.log('\nAfter schema changes, run: npm run prepare:catalog');
-    console.log('\n⚠  Update the placeholder $id and catalogId in package.json before publishing.');
+    console.log('\nAfter schema changes, run: npx freesail prepare catalog');
+    console.log('\n⚠  Update the package scope (e.g. @myorg) before publishing.');
   } finally {
     rl.close();
   }
