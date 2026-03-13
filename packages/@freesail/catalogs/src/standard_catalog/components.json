@@ -1,0 +1,494 @@
+{
+  "components": {
+    "Image": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Displays an image. Key properties: url (required), fit (contain/cover/fill/none/scale-down), variant (icon/avatar/smallFeature/mediumFeature/largeFeature/header).",
+          "properties": {
+            "component": {
+              "const": "Image"
+            },
+            "url": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The URL of the image to display."
+            },
+            "fit": {
+              "type": "string",
+              "description": "Specifies how the image should be resized to fit its container. This corresponds to the CSS 'object-fit' property.",
+              "enum": [
+                "contain",
+                "cover",
+                "fill",
+                "none",
+                "scale-down"
+              ]
+            },
+            "variant": {
+              "type": "string",
+              "description": "A hint for the image size and style.",
+              "enum": [
+                "icon",
+                "avatar",
+                "smallFeature",
+                "mediumFeature",
+                "largeFeature",
+                "header"
+              ]
+            }
+          },
+          "required": [
+            "component",
+            "url"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Video": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Plays a video. Key properties: url (required), embed (set to true for YouTube/Vimeo URLs).",
+          "properties": {
+            "component": {
+              "const": "Video"
+            },
+            "url": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The URL of the video to display."
+            },
+            "embed": {
+              "type": "boolean",
+              "description": "When true, the video is rendered inside an iframe. This MUST be set to true for third-party sources such as YouTube (youtube.com, youtu.be) and Vimeo (vimeo.com). When false or omitted, a native video player is used, which only works with direct video file URLs (e.g. .mp4, .webm).",
+              "default": false
+            }
+          },
+          "required": [
+            "component",
+            "url"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "AudioPlayer": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "An audio player that supports direct audio file URLs and embedded third-party players (e.g. Spotify, SoundCloud).",
+          "properties": {
+            "component": {
+              "const": "AudioPlayer"
+            },
+            "url": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The URL of the audio to be played."
+            },
+            "description": {
+              "description": "A description of the audio, such as a title or summary.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString"
+            },
+            "embed": {
+              "type": "boolean",
+              "description": "When true, the audio is rendered inside an iframe embed player. This MUST be set to true for third-party sources such as Spotify (open.spotify.com) and SoundCloud (soundcloud.com). When false or omitted, a native audio player is used, which only works with direct audio file URLs (e.g. .mp3, .wav).",
+              "default": false
+            }
+          },
+          "required": [
+            "component",
+            "url"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "List": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A scrollable list that lays out children vertically or horizontally, with optional alignment control.",
+          "properties": {
+            "component": {
+              "const": "List"
+            },
+            "children": {
+              "description": "Defines the children. Use an array of strings for a fixed set of children, or a template object to generate children from a data list.",
+              "$ref": "../common/common_types.json#/$defs/ChildList"
+            },
+            "direction": {
+              "type": "string",
+              "description": "The direction in which the list items are laid out.",
+              "enum": [
+                "vertical",
+                "horizontal"
+              ]
+            },
+            "align": {
+              "type": "string",
+              "description": "Defines the alignment of children along the cross axis.",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "stretch"
+              ]
+            }
+          },
+          "required": [
+            "component",
+            "children"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Tabs": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A tabbed container that shows one child at a time. Key properties: tabs (required, array of objects with title and child).",
+          "properties": {
+            "component": {
+              "const": "Tabs"
+            },
+            "tabs": {
+              "type": "array",
+              "description": "An array of objects, where each object defines a tab with a title and a child component.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "description": "The tab title.",
+                    "$ref": "../common/common_types.json#/$defs/DynamicString"
+                  },
+                  "child": {
+                    "$ref": "../common/common_types.json#/$defs/ComponentId",
+                    "description": "The ID of the child component. Do NOT define the component inline."
+                  }
+                },
+                "required": [
+                  "title",
+                  "child"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "component",
+            "tabs"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Divider": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A visual separator line. Key properties: axis (horizontal/vertical, default horizontal).",
+          "properties": {
+            "component": {
+              "const": "Divider"
+            },
+            "axis": {
+              "type": "string",
+              "description": "The orientation of the divider.",
+              "enum": [
+                "horizontal",
+                "vertical"
+              ],
+              "default": "horizontal"
+            }
+          },
+          "required": [
+            "component"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Dropdown": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A dropdown (select) component for choosing a single option from a list.",
+          "properties": {
+            "component": {
+              "const": "Dropdown"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The label for the dropdown."
+            },
+            "hideLabel": {
+              "type": "boolean",
+              "description": "When true, hides the label above the dropdown. Use this when the Dropdown is inside a GridLayout — the column headers already act as labels.",
+              "default": false
+            },
+            "placeholder": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Placeholder text shown when no option is selected."
+            },
+            "options": {
+              "description": "The list of available options to choose from. Can be a literal array or a data binding to a list in the data model.",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "description": "The text to display for this option.",
+                        "$ref": "../common/common_types.json#/$defs/DynamicString"
+                      },
+                      "value": {
+                        "type": "string",
+                        "description": "The stable value associated with this option."
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The currently selected value. This should be bound to a string in the data model."
+            }
+          },
+          "required": [
+            "component",
+            "options",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "CheckBox": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A checkbox toggle for boolean values. Key properties: label (required), value (required, data binding for the checked state).",
+          "properties": {
+            "component": {
+              "const": "CheckBox"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The text to display next to the checkbox."
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "The current state of the checkbox (true for checked, false for unchecked)."
+            }
+          },
+          "required": [
+            "component",
+            "label",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Slider": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A slider for selecting a numeric value within a range. Key properties: value (required), min (required), max (required), label.",
+          "properties": {
+            "component": {
+              "const": "Slider"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The label for the slider."
+            },
+            "min": {
+              "type": "number",
+              "description": "The minimum value of the slider."
+            },
+            "max": {
+              "type": "number",
+              "description": "The maximum value of the slider."
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "The current value of the slider."
+            }
+          },
+          "required": [
+            "component",
+            "value",
+            "min",
+            "max"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Markdown": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders rich Markdown content. Use this for multi-paragraph text, formatted content, or when HTML-like structure is needed. Key properties: text (required, the markdown string to render).",
+          "properties": {
+            "component": {
+              "const": "Markdown"
+            },
+            "text": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The markdown content to display."
+            }
+          },
+          "required": [
+            "component",
+            "text"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "GridLayout": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Displays tabular data with styled rows (alternating backgrounds, borders). Can also be used as a structured grid layout without headers. Follows A2UI composition: Grid provides the grid structure and optional header row, while the row content is composed using existing Row and Text components via the children template. Key properties: headers (optional, array of column header strings; determines column count), children (required, ChildList template pointing to a Row component and a data path), rowPadding (controls the padding of each cell; default '10px 16px'; use to add vertical spacing between rows, e.g. '14px 16px'). IMPORTANT: Row padding is controlled by rowPadding on the GridLayout, not by padding on the child Row components. IMPORTANT: When placing TextField or Dropdown components inside a GridLayout, always set hideLabel: true on each one — the column headers already serve as labels, and showing them again inside each cell makes rows unnecessarily tall.",
+          "properties": {
+            "component": {
+              "const": "GridLayout"
+            },
+            "headers": {
+              "type": "array",
+              "items": {
+                "$ref": "../common/common_types.json#/$defs/DynamicString"
+              },
+              "description": "The column header labels displayed in the header row."
+            },
+            "children": {
+              "description": "Defines the row content. Use a template object { componentId, path } to generate rows from a data list. The componentId should reference a Row component containing Text components for each column.",
+              "$ref": "../common/common_types.json#/$defs/ChildList"
+            },
+            "rowPadding": {
+              "description": "CSS padding applied to every cell in each data row. Use this to control row height and vertical spacing. Defaults to '10px 16px'. Example: '16px' for taller rows with more breathing room.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "default": "10px 16px"
+            }
+          },
+          "required": [
+            "component",
+            "children"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  },
+  "$defs": {
+    "CatalogComponentCommon": {
+      "type": "object",
+      "properties": {
+        "weight": {
+          "type": "number",
+          "description": "The relative weight of this component within a Row or Column. This is similar to the CSS 'flex-grow' property. Note: this may ONLY be set when the component is a direct descendant of a Row or Column."
+        }
+      }
+    }
+  }
+}

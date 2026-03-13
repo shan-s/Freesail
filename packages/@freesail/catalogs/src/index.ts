@@ -17,4 +17,5 @@
 
 export * from './standard_catalog/index.js';
 export * from './chat_catalog/index.js';
+export * from './common/index.js';
 

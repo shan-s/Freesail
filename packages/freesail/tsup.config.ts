@@ -7,7 +7,7 @@ export default defineConfig([
     format: ['cjs', 'esm'],
     dts: true,
     clean: true,
-    external: ['@freesail/core', '@freesail/react'],
+    external: ['@freesail/core', '@freesail/react', '@freesail/catalogs'],
   },
   // CLI build — CJS only, with shebang banner
   {
@@ -18,6 +18,6 @@ export default defineConfig([
     banner: {
       js: '#!/usr/bin/env node',
     },
-    external: ['@freesail/core', '@freesail/react', '@freesail/gateway'],
+    external: ['@freesail/core', '@freesail/react', '@freesail/gateway', '@freesail/catalogs'],
   },
 ]);

@@ -10,6 +10,7 @@
 
 import React, { type CSSProperties } from 'react';
 import type { FreesailComponentProps } from '@freesail/react';
+import { commonComponents } from './common/CommonComponents.js';
 
 // =============================================================================
 // Condition Icons & Colors
@@ -655,6 +656,7 @@ export function AirQuality({ component }: FreesailComponentProps) {
 // =============================================================================
 
 export const weatherCatalogComponents = {
+  ...commonComponents,
   WeatherCard,
   ForecastRow,
   ForecastPanel,

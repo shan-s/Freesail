@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/catalog.schema.json",
+  "$schema": "../schemas/catalog-schema.json",
   "$id": "https://freesail.dev/catalogs/standard_catalog_v1.json",
   "title": "Freesail Standard Catalog",
   "description": "Unified catalog of standard A2UI components and functions.\n\n### Function Call Syntax\n\nWhen using functions in component properties (e.g. `checks`, `value`, `text`, `min`, `max`):\n\n**Single-argument functions** (`not`, `isEmpty`, `required`, `email`, `regex`, etc.) use a named-key object for `args`:\n```json\n{ \"call\": \"not\", \"args\": { \"value\": { \"call\": \"isEmpty\", \"args\": { \"value\": { \"path\": \"/data/x\" } } } } }\n```\n\n**Multi-argument functions** (`lte`, `gte`, `lt`, `gt`, `eq`, `neq`, `and`, `or`, `length`, `numeric`) take positional args — pass them as an **array**:\n```json\n{ \"call\": \"lte\", \"args\": [{ \"path\": \"/formData/dob\" }, { \"call\": \"now\" }] }\n{ \"call\": \"and\", \"args\": [{ \"call\": \"required\", \"args\": { \"value\": { \"path\": \"/a\" } } }, { \"call\": \"required\", \"args\": { \"value\": { \"path\": \"/b\" } } }] }\n```",
@@ -54,58 +54,6 @@
           "required": [
             "component",
             "text"
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "Image": {
-      "type": "object",
-      "allOf": [
-        {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
-        },
-        {
-          "$ref": "#/$defs/CatalogComponentCommon"
-        },
-        {
-          "type": "object",
-          "description": "Displays an image. Key properties: url (required), fit (contain/cover/fill/none/scale-down), variant (icon/avatar/smallFeature/mediumFeature/largeFeature/header).",
-          "properties": {
-            "component": {
-              "const": "Image"
-            },
-            "url": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
-              "description": "The URL of the image to display."
-            },
-            "fit": {
-              "type": "string",
-              "description": "Specifies how the image should be resized to fit its container. This corresponds to the CSS 'object-fit' property.",
-              "enum": [
-                "contain",
-                "cover",
-                "fill",
-                "none",
-                "scale-down"
-              ]
-            },
-            "variant": {
-              "type": "string",
-              "description": "A hint for the image size and style.",
-              "enum": [
-                "icon",
-                "avatar",
-                "smallFeature",
-                "mediumFeature",
-                "largeFeature",
-                "header"
-              ]
-            }
-          },
-          "required": [
-            "component",
-            "url"
           ]
         }
       ],
@@ -212,77 +160,6 @@
           "required": [
             "component",
             "name"
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "Video": {
-      "type": "object",
-      "allOf": [
-        {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
-        },
-        {
-          "$ref": "#/$defs/CatalogComponentCommon"
-        },
-        {
-          "type": "object",
-          "description": "Plays a video. Key properties: url (required), embed (set to true for YouTube/Vimeo URLs).",
-          "properties": {
-            "component": {
-              "const": "Video"
-            },
-            "url": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
-              "description": "The URL of the video to display."
-            },
-            "embed": {
-              "type": "boolean",
-              "description": "When true, the video is rendered inside an iframe. This MUST be set to true for third-party sources such as YouTube (youtube.com, youtu.be) and Vimeo (vimeo.com). When false or omitted, a native video player is used, which only works with direct video file URLs (e.g. .mp4, .webm).",
-              "default": false
-            }
-          },
-          "required": [
-            "component",
-            "url"
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "AudioPlayer": {
-      "type": "object",
-      "allOf": [
-        {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
-        },
-        {
-          "$ref": "#/$defs/CatalogComponentCommon"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "component": {
-              "const": "AudioPlayer"
-            },
-            "url": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
-              "description": "The URL of the audio to be played."
-            },
-            "description": {
-              "description": "A description of the audio, such as a title or summary.",
-              "$ref": "../common/common_types.json#/$defs/DynamicString"
-            },
-            "embed": {
-              "type": "boolean",
-              "description": "When true, the audio is rendered inside an iframe embed player. This MUST be set to true for third-party sources such as Spotify (open.spotify.com) and SoundCloud (soundcloud.com). When false or omitted, a native audio player is used, which only works with direct audio file URLs (e.g. .mp3, .wav).",
-              "default": false
-            }
-          },
-          "required": [
-            "component",
-            "url"
           ]
         }
       ],
@@ -410,52 +287,6 @@
       ],
       "unevaluatedProperties": false
     },
-    "List": {
-      "type": "object",
-      "allOf": [
-        {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
-        },
-        {
-          "$ref": "#/$defs/CatalogComponentCommon"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "component": {
-              "const": "List"
-            },
-            "children": {
-              "description": "Defines the children. Use an array of strings for a fixed set of children, or a template object to generate children from a data list.",
-              "$ref": "../common/common_types.json#/$defs/ChildList"
-            },
-            "direction": {
-              "type": "string",
-              "description": "The direction in which the list items are laid out.",
-              "enum": [
-                "vertical",
-                "horizontal"
-              ]
-            },
-            "align": {
-              "type": "string",
-              "description": "Defines the alignment of children along the cross axis.",
-              "enum": [
-                "start",
-                "center",
-                "end",
-                "stretch"
-              ]
-            }
-          },
-          "required": [
-            "component",
-            "children"
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
     "Card": {
       "type": "object",
       "allOf": [
@@ -502,53 +333,6 @@
       ],
       "unevaluatedProperties": false
     },
-    "Tabs": {
-      "type": "object",
-      "allOf": [
-        {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
-        },
-        {
-          "$ref": "#/$defs/CatalogComponentCommon"
-        },
-        {
-          "type": "object",
-          "description": "A tabbed container that shows one child at a time. Key properties: tabs (required, array of objects with title and child).",
-          "properties": {
-            "component": {
-              "const": "Tabs"
-            },
-            "tabs": {
-              "type": "array",
-              "description": "An array of objects, where each object defines a tab with a title and a child component.",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "title": {
-                    "description": "The tab title.",
-                    "$ref": "../common/common_types.json#/$defs/DynamicString"
-                  },
-                  "child": {
-                    "$ref": "../common/common_types.json#/$defs/ComponentId",
-                    "description": "The ID of the child component. Do NOT define the component inline."
-                  }
-                },
-                "required": [
-                  "title",
-                  "child"
-                ],
-                "additionalProperties": false
-              }
-            }
-          },
-          "required": [
-            "component",
-            "tabs"
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
     "Modal": {
       "type": "object",
       "allOf": [
@@ -578,39 +362,6 @@
             "component",
             "trigger",
             "content"
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "Divider": {
-      "type": "object",
-      "allOf": [
-        {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
-        },
-        {
-          "$ref": "#/$defs/CatalogComponentCommon"
-        },
-        {
-          "type": "object",
-          "description": "A visual separator line. Key properties: axis (horizontal/vertical, default horizontal).",
-          "properties": {
-            "component": {
-              "const": "Divider"
-            },
-            "axis": {
-              "type": "string",
-              "description": "The orientation of the divider.",
-              "enum": [
-                "horizontal",
-                "vertical"
-              ],
-              "default": "horizontal"
-            }
-          },
-          "required": [
-            "component"
           ]
         }
       ],
@@ -793,6 +544,401 @@
       ],
       "unevaluatedProperties": false
     },
+    "DateTimeInput": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A date and/or time picker input. Key properties: value (required, ISO 8601 format), enableDate, enableTime, min, max, label.",
+          "properties": {
+            "component": {
+              "const": "DateTimeInput"
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The selected date and/or time value in ISO 8601 format. If not yet set, initialize with an empty string."
+            },
+            "enableDate": {
+              "type": "boolean",
+              "description": "If true, allows the user to select a date."
+            },
+            "enableTime": {
+              "type": "boolean",
+              "description": "If true, allows the user to select a time."
+            },
+            "min": {
+              "allOf": [
+                {
+                  "$ref": "../common/common_types.json#/$defs/DynamicString"
+                },
+                {
+                  "if": {
+                    "type": "string"
+                  },
+                  "then": {
+                    "oneOf": [
+                      {
+                        "format": "date"
+                      },
+                      {
+                        "format": "time"
+                      },
+                      {
+                        "format": "date-time"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "description": "The minimum allowed date/time in ISO 8601 format."
+            },
+            "max": {
+              "allOf": [
+                {
+                  "$ref": "../common/common_types.json#/$defs/DynamicString"
+                },
+                {
+                  "if": {
+                    "type": "string"
+                  },
+                  "then": {
+                    "oneOf": [
+                      {
+                        "format": "date"
+                      },
+                      {
+                        "format": "time"
+                      },
+                      {
+                        "format": "date-time"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "description": "The maximum allowed date/time in ISO 8601 format."
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The text label for the input field."
+            }
+          },
+          "required": [
+            "component",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Spacer": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "An empty space component used for layout and spacing.",
+          "properties": {
+            "component": {
+              "const": "Spacer"
+            },
+            "width": {
+              "oneOf": [
+                {
+                  "$ref": "../common/common_types.json#/$defs/DynamicString"
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DynamicNumber"
+                }
+              ],
+              "description": "The width of the spacer. If a number is provided, it is treated as pixels. Defaults to '16px'.",
+              "default": "16px"
+            },
+            "height": {
+              "oneOf": [
+                {
+                  "$ref": "../common/common_types.json#/$defs/DynamicString"
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DynamicNumber"
+                }
+              ],
+              "description": "The height of the spacer. If a number is provided, it is treated as pixels. Defaults to '16px'.",
+              "default": "16px"
+            }
+          },
+          "required": [
+            "component"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Image": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Displays an image. Key properties: url (required), fit (contain/cover/fill/none/scale-down), variant (icon/avatar/smallFeature/mediumFeature/largeFeature/header).",
+          "properties": {
+            "component": {
+              "const": "Image"
+            },
+            "url": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The URL of the image to display."
+            },
+            "fit": {
+              "type": "string",
+              "description": "Specifies how the image should be resized to fit its container. This corresponds to the CSS 'object-fit' property.",
+              "enum": [
+                "contain",
+                "cover",
+                "fill",
+                "none",
+                "scale-down"
+              ]
+            },
+            "variant": {
+              "type": "string",
+              "description": "A hint for the image size and style.",
+              "enum": [
+                "icon",
+                "avatar",
+                "smallFeature",
+                "mediumFeature",
+                "largeFeature",
+                "header"
+              ]
+            }
+          },
+          "required": [
+            "component",
+            "url"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Video": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Plays a video. Key properties: url (required), embed (set to true for YouTube/Vimeo URLs).",
+          "properties": {
+            "component": {
+              "const": "Video"
+            },
+            "url": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The URL of the video to display."
+            },
+            "embed": {
+              "type": "boolean",
+              "description": "When true, the video is rendered inside an iframe. This MUST be set to true for third-party sources such as YouTube (youtube.com, youtu.be) and Vimeo (vimeo.com). When false or omitted, a native video player is used, which only works with direct video file URLs (e.g. .mp4, .webm).",
+              "default": false
+            }
+          },
+          "required": [
+            "component",
+            "url"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "AudioPlayer": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "An audio player that supports direct audio file URLs and embedded third-party players (e.g. Spotify, SoundCloud).",
+          "properties": {
+            "component": {
+              "const": "AudioPlayer"
+            },
+            "url": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The URL of the audio to be played."
+            },
+            "description": {
+              "description": "A description of the audio, such as a title or summary.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString"
+            },
+            "embed": {
+              "type": "boolean",
+              "description": "When true, the audio is rendered inside an iframe embed player. This MUST be set to true for third-party sources such as Spotify (open.spotify.com) and SoundCloud (soundcloud.com). When false or omitted, a native audio player is used, which only works with direct audio file URLs (e.g. .mp3, .wav).",
+              "default": false
+            }
+          },
+          "required": [
+            "component",
+            "url"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "List": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A scrollable list that lays out children vertically or horizontally, with optional alignment control.",
+          "properties": {
+            "component": {
+              "const": "List"
+            },
+            "children": {
+              "description": "Defines the children. Use an array of strings for a fixed set of children, or a template object to generate children from a data list.",
+              "$ref": "../common/common_types.json#/$defs/ChildList"
+            },
+            "direction": {
+              "type": "string",
+              "description": "The direction in which the list items are laid out.",
+              "enum": [
+                "vertical",
+                "horizontal"
+              ]
+            },
+            "align": {
+              "type": "string",
+              "description": "Defines the alignment of children along the cross axis.",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "stretch"
+              ]
+            }
+          },
+          "required": [
+            "component",
+            "children"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Tabs": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A tabbed container that shows one child at a time. Key properties: tabs (required, array of objects with title and child).",
+          "properties": {
+            "component": {
+              "const": "Tabs"
+            },
+            "tabs": {
+              "type": "array",
+              "description": "An array of objects, where each object defines a tab with a title and a child component.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "description": "The tab title.",
+                    "$ref": "../common/common_types.json#/$defs/DynamicString"
+                  },
+                  "child": {
+                    "$ref": "../common/common_types.json#/$defs/ComponentId",
+                    "description": "The ID of the child component. Do NOT define the component inline."
+                  }
+                },
+                "required": [
+                  "title",
+                  "child"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "component",
+            "tabs"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Divider": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A visual separator line. Key properties: axis (horizontal/vertical, default horizontal).",
+          "properties": {
+            "component": {
+              "const": "Divider"
+            },
+            "axis": {
+              "type": "string",
+              "description": "The orientation of the divider.",
+              "enum": [
+                "horizontal",
+                "vertical"
+              ],
+              "default": "horizontal"
+            }
+          },
+          "required": [
+            "component"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
     "Dropdown": {
       "type": "object",
       "allOf": [
@@ -951,54 +1097,6 @@
       ],
       "unevaluatedProperties": false
     },
-    "Spacer": {
-      "type": "object",
-      "allOf": [
-        {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
-        },
-        {
-          "$ref": "#/$defs/CatalogComponentCommon"
-        },
-        {
-          "type": "object",
-          "description": "An empty space component used for layout and spacing.",
-          "properties": {
-            "component": {
-              "const": "Spacer"
-            },
-            "width": {
-              "oneOf": [
-                {
-                  "$ref": "../common/common_types.json#/$defs/DynamicString"
-                },
-                {
-                  "$ref": "../common/common_types.json#/$defs/DynamicNumber"
-                }
-              ],
-              "description": "The width of the spacer. If a number is provided, it is treated as pixels. Defaults to '16px'.",
-              "default": "16px"
-            },
-            "height": {
-              "oneOf": [
-                {
-                  "$ref": "../common/common_types.json#/$defs/DynamicString"
-                },
-                {
-                  "$ref": "../common/common_types.json#/$defs/DynamicNumber"
-                }
-              ],
-              "description": "The height of the spacer. If a number is provided, it is treated as pixels. Defaults to '16px'.",
-              "default": "16px"
-            }
-          },
-          "required": [
-            "component"
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
     "Markdown": {
       "type": "object",
       "allOf": [
@@ -1023,102 +1121,6 @@
           "required": [
             "component",
             "text"
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "DateTimeInput": {
-      "type": "object",
-      "allOf": [
-        {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
-        },
-        {
-          "$ref": "#/$defs/CatalogComponentCommon"
-        },
-        {
-          "$ref": "../common/common_types.json#/$defs/Checkable"
-        },
-        {
-          "type": "object",
-          "description": "A date and/or time picker input. Key properties: value (required, ISO 8601 format), enableDate, enableTime, min, max, label.",
-          "properties": {
-            "component": {
-              "const": "DateTimeInput"
-            },
-            "value": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
-              "description": "The selected date and/or time value in ISO 8601 format. If not yet set, initialize with an empty string."
-            },
-            "enableDate": {
-              "type": "boolean",
-              "description": "If true, allows the user to select a date."
-            },
-            "enableTime": {
-              "type": "boolean",
-              "description": "If true, allows the user to select a time."
-            },
-            "min": {
-              "allOf": [
-                {
-                  "$ref": "../common/common_types.json#/$defs/DynamicString"
-                },
-                {
-                  "if": {
-                    "type": "string"
-                  },
-                  "then": {
-                    "oneOf": [
-                      {
-                        "format": "date"
-                      },
-                      {
-                        "format": "time"
-                      },
-                      {
-                        "format": "date-time"
-                      }
-                    ]
-                  }
-                }
-              ],
-              "description": "The minimum allowed date/time in ISO 8601 format."
-            },
-            "max": {
-              "allOf": [
-                {
-                  "$ref": "../common/common_types.json#/$defs/DynamicString"
-                },
-                {
-                  "if": {
-                    "type": "string"
-                  },
-                  "then": {
-                    "oneOf": [
-                      {
-                        "format": "date"
-                      },
-                      {
-                        "format": "time"
-                      },
-                      {
-                        "format": "date-time"
-                      }
-                    ]
-                  }
-                }
-              ],
-              "description": "The maximum allowed date/time in ISO 8601 format."
-            },
-            "label": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
-              "description": "The text label for the input field."
-            }
-          },
-          "required": [
-            "component",
-            "value"
           ]
         }
       ],
@@ -1166,9 +1168,8 @@
       "unevaluatedProperties": false
     }
   },
-  "functions": [
-    {
-      "name": "required",
+  "functions": {
+    "required": {
       "description": "Checks that the value is not null, undefined, or empty.",
       "returnType": "boolean",
       "parameters": {
@@ -1181,8 +1182,7 @@
         "minItems": 1
       }
     },
-    {
-      "name": "regex",
+    "regex": {
       "description": "Checks that the value matches a regular expression string.",
       "returnType": "boolean",
       "parameters": {
@@ -1199,8 +1199,7 @@
         "minItems": 2
       }
     },
-    {
-      "name": "length",
+    "length": {
       "description": "Checks string length constraints.",
       "returnType": "boolean",
       "parameters": {
@@ -1240,8 +1239,7 @@
         "minItems": 2
       }
     },
-    {
-      "name": "numeric",
+    "numeric": {
       "description": "Checks numeric range constraints.",
       "returnType": "boolean",
       "parameters": {
@@ -1279,8 +1277,7 @@
         "minItems": 2
       }
     },
-    {
-      "name": "email",
+    "email": {
       "description": "Checks that the value is a valid email address.",
       "returnType": "boolean",
       "parameters": {
@@ -1293,8 +1290,7 @@
         "minItems": 1
       }
     },
-    {
-      "name": "formatString",
+    "formatString": {
       "description": "Performs string interpolation of data model values and other functions in the catalog functions list and returns the resulting string. The value string can contain interpolated expressions in the `${expression}` format. Supported expression types include: JSON Pointer paths to the data model (e.g., `${/absolute/path}` or `${relative/path}`), and client-side function calls (e.g., `${now()}`). Function arguments must be literals (quoted strings, numbers, booleans) or nested expressions (e.g., `${formatDate(${/currentDate}, 'MM-dd')}`). To include a literal `${` sequence, escape it as `\\${`.",
       "returnType": "string",
       "parameters": {
@@ -1311,8 +1307,7 @@
         "minItems": 1
       }
     },
-    {
-      "name": "formatNumber",
+    "formatNumber": {
       "description": "Formats a number with the specified grouping and decimal precision.",
       "returnType": "string",
       "parameters": {
@@ -1334,8 +1329,7 @@
         "minItems": 1
       }
     },
-    {
-      "name": "formatCurrency",
+    "formatCurrency": {
       "description": "Formats a number as a currency string.",
       "returnType": "string",
       "parameters": {
@@ -1353,8 +1347,7 @@
         "minItems": 2
       }
     },
-    {
-      "name": "formatDate",
+    "formatDate": {
       "description": "Formats a timestamp into a string using a pattern.",
       "returnType": "string",
       "parameters": {
@@ -1372,8 +1365,7 @@
         "minItems": 2
       }
     },
-    {
-      "name": "pluralize",
+    "pluralize": {
       "description": "Returns a localized string based on the Common Locale Data Repository (CLDR) plural category of the count (zero, one, two, few, many, other). Requires an 'other' fallback. For English, just use 'one' and 'other'.",
       "returnType": "string",
       "parameters": {
@@ -1422,8 +1414,7 @@
         "maxItems": 2
       }
     },
-    {
-      "name": "now",
+    "now": {
       "description": "Returns the current date and time as an ISO 8601 string.",
       "returnType": "string",
       "parameters": {
@@ -1432,8 +1423,7 @@
         "maxItems": 0
       }
     },
-    {
-      "name": "openUrl",
+    "openUrl": {
       "description": "Opens the specified URL in a browser or handler. This function has no return value.",
       "returnType": "void",
       "parameters": {
@@ -1455,8 +1445,7 @@
         "unevaluatedProperties": false
       }
     },
-    {
-      "name": "not",
+    "not": {
       "description": "Returns the logical negation of the value.",
       "returnType": "boolean",
       "parameters": {
@@ -1470,8 +1459,7 @@
         "maxItems": 1
       }
     },
-    {
-      "name": "and",
+    "and": {
       "description": "Returns true if all arguments are truthy.",
       "returnType": "boolean",
       "parameters": {
@@ -1482,8 +1470,7 @@
         }
       }
     },
-    {
-      "name": "or",
+    "or": {
       "description": "Returns true if any argument is truthy.",
       "returnType": "boolean",
       "parameters": {
@@ -1494,8 +1481,7 @@
         }
       }
     },
-    {
-      "name": "isEmpty",
+    "isEmpty": {
       "description": "Returns true if the value is null, undefined, empty string, empty array, or empty object.",
       "returnType": "boolean",
       "parameters": {
@@ -1509,8 +1495,7 @@
         "maxItems": 1
       }
     },
-    {
-      "name": "eq",
+    "eq": {
       "description": "Returns true if the two values are strictly equal.",
       "returnType": "boolean",
       "parameters": {
@@ -1527,8 +1512,7 @@
         "maxItems": 2
       }
     },
-    {
-      "name": "neq",
+    "neq": {
       "description": "Returns true if the two values are not equal.",
       "returnType": "boolean",
       "parameters": {
@@ -1545,8 +1529,7 @@
         "maxItems": 2
       }
     },
-    {
-      "name": "gt",
+    "gt": {
       "description": "Returns true if the first value is greater than the second (converted to numbers).",
       "returnType": "boolean",
       "parameters": {
@@ -1563,8 +1546,7 @@
         "maxItems": 2
       }
     },
-    {
-      "name": "gte",
+    "gte": {
       "description": "Returns true if the first value is greater than or equal to the second (converted to numbers).",
       "returnType": "boolean",
       "parameters": {
@@ -1581,8 +1563,7 @@
         "maxItems": 2
       }
     },
-    {
-      "name": "lt",
+    "lt": {
       "description": "Returns true if the first value is less than the second (converted to numbers).",
       "returnType": "boolean",
       "parameters": {
@@ -1599,8 +1580,7 @@
         "maxItems": 2
       }
     },
-    {
-      "name": "lte",
+    "lte": {
       "description": "Returns true if the first value is less than or equal to the second (converted to numbers).",
       "returnType": "boolean",
       "parameters": {
@@ -1617,7 +1597,7 @@
         "maxItems": 2
       }
     }
-  ],
+  },
   "$defs": {
     "CatalogComponentCommon": {
       "type": "object",
@@ -1626,76 +1606,6 @@
           "type": "number",
           "description": "The relative weight of this component within a Row or Column. This is similar to the CSS 'flex-grow' property. Note: this may ONLY be set when the component is a direct descendant of a Row or Column."
         }
-      }
-    },
-    "anyComponent": {
-      "oneOf": [
-        {
-          "$ref": "#/components/Text"
-        },
-        {
-          "$ref": "#/components/Image"
-        },
-        {
-          "$ref": "#/components/Icon"
-        },
-        {
-          "$ref": "#/components/Video"
-        },
-        {
-          "$ref": "#/components/AudioPlayer"
-        },
-        {
-          "$ref": "#/components/Row"
-        },
-        {
-          "$ref": "#/components/Column"
-        },
-        {
-          "$ref": "#/components/List"
-        },
-        {
-          "$ref": "#/components/Card"
-        },
-        {
-          "$ref": "#/components/Tabs"
-        },
-        {
-          "$ref": "#/components/Modal"
-        },
-        {
-          "$ref": "#/components/Divider"
-        },
-        {
-          "$ref": "#/components/Button"
-        },
-        {
-          "$ref": "#/components/TextField"
-        },
-        {
-          "$ref": "#/components/CheckBox"
-        },
-        {
-          "$ref": "#/components/ChoicePicker"
-        },
-        {
-          "$ref": "#/components/Slider"
-        },
-        {
-          "$ref": "#/components/DateTimeInput"
-        },
-        {
-          "$ref": "#/components/Spacer"
-        },
-        {
-          "$ref": "#/components/Dropdown"
-        },
-        {
-          "$ref": "#/components/Markdown"
-        }
-      ],
-      "discriminator": {
-        "propertyName": "component"
       }
     }
   }

@@ -123,8 +123,7 @@ export interface Catalog {
   description?: string;
   $defs?: Record<string, unknown>;
   components: Record<string, CatalogComponent>;
-  functions?: Array<{
-    name: string;
+  functions?: Record<string, {
     description?: string;
     parameters?: Record<string, unknown>;
     returnType?: string;
@@ -532,10 +531,11 @@ export function generateCatalogPrompt(catalog: Catalog): string {
   }
 
   // Include Available Functions
-  if (catalog.functions && catalog.functions.length > 0) {
+  const funcEntries = catalog.functions ? Object.entries(catalog.functions) : [];
+  if (funcEntries.length > 0) {
     lines.push('### Available Functions:', '');
-    for (const func of catalog.functions) {
-      lines.push(`**${func.name}**`);
+    for (const [name, func] of funcEntries) {
+      lines.push(`**${name}**`);
       if (func.description) {
         lines.push(`  ${func.description}`);
       }
@@ -629,7 +629,7 @@ const catalogComponentSchema = z.object({
 }).passthrough();
 
 const catalogFunctionSchema = z.object({
-  name: z.string(),
+  name: z.string().optional(),
   description: z.string().optional(),
   parameters: z.record(z.unknown()).optional(),
   returnType: z.string().optional(),
@@ -644,7 +644,7 @@ export const catalogSchema = z.object({
   description: z.string().optional(),
   $defs: z.record(z.unknown()).optional(),
   components: z.record(catalogComponentSchema),
-  functions: z.array(catalogFunctionSchema).optional(),
+  functions: z.record(catalogFunctionSchema).optional(),
   freesailSdkVersion: z.string().optional(),
 }).passthrough();
 

@@ -45,8 +45,11 @@ export const CHAT_CATALOG_ID = catalogSchema.catalogId;
  * </FreesailProvider>
  * ```
  */
+import { chatCatalogFunctions } from './functions.js';
+
 export const ChatCatalog: CatalogDefinition = {
   namespace: CHAT_CATALOG_ID,
   schema: catalogSchema,
   components: chatCatalogComponents,
+  functions: chatCatalogFunctions,
 };

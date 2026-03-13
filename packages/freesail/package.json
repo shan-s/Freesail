@@ -20,6 +20,7 @@
     "tsup": "^8.0.0"
   },
   "dependencies": {
+    "@freesail/catalogs": "^0.4.3",
     "@freesail/core": "^0.4.3",
     "@freesail/gateway": "^0.4.3",
     "@freesail/react": "^0.4.3"

@@ -22,7 +22,14 @@
 import fs from 'fs';
 import path from 'path';
 
-const CWD = process.cwd();
+// When running as an npm lifecycle script (e.g. prebuild), npm sets
+// process.cwd() to the package root — INIT_CWD would incorrectly point
+// to the workspace root during workspace builds.
+// For direct CLI invocations (npx freesail …), INIT_CWD preserves the
+// user's shell CWD which is what we want.
+const CWD = process.env['npm_lifecycle_event']
+  ? process.cwd()
+  : (process.env['INIT_CWD'] || process.cwd());
 
 /**
  * Functions that are part of the A2UI protocol and cannot be removed.
@@ -46,24 +53,29 @@ function getCatalogConfig(dir: string, nameOverride?: string): CatalogConfig | n
 
   const prefix = match[1] as string;
 
-  // Probe for the JSON file — must be in src/
-  const srcDir = path.join(dir, 'src');
-  if (!fs.existsSync(srcDir)) return null;
-
   const candidates = [
     `${prefix}_catalog.json`,
     `${prefix}_catalog_v1.json`,
   ];
 
+  // Probe for the JSON file — check dir/src/ first (standalone catalog),
+  // then dir/ itself (monorepo sub-catalog where sources live directly in the folder).
+  let srcDir: string | null = null;
   let jsonFile: string | null = null;
-  for (const candidate of candidates) {
-    if (fs.existsSync(path.join(srcDir, candidate))) {
-      jsonFile = candidate;
-      break;
+
+  for (const probe of [path.join(dir, 'src'), dir]) {
+    if (!fs.existsSync(probe)) continue;
+    for (const candidate of candidates) {
+      if (fs.existsSync(path.join(probe, candidate))) {
+        srcDir = probe;
+        jsonFile = candidate;
+        break;
+      }
     }
+    if (jsonFile) break;
   }
 
-  if (!jsonFile) return null;
+  if (!srcDir || !jsonFile) return null;
   if (!fs.existsSync(path.join(srcDir, 'index.ts'))) return null;
 
   return { name: folderName, packagePath: dir, srcPath: srcDir, jsonFile, prefix };
@@ -126,7 +138,7 @@ function extractExports(source: string): Set<string> {
  * Check whether the catalog's merged function map includes each mandatory function.
  *
  * Strategy (static analysis, no dynamic import):
- *   - If index.ts spreads `...commonFunctions` → all common functions present ✓
+ *   - If index.ts or functions.ts imports/re-exports commonFunctions → all common functions present ✓
  *   - Otherwise check if each mandatory function is exported from functions.ts or index.ts
  */
 function checkMandatoryFunctions(srcPath: string, isOk: boolean): boolean {
@@ -138,15 +150,30 @@ function checkMandatoryFunctions(srcPath: string, isOk: boolean): boolean {
   const indexSource = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf-8') : '';
   const functionsSource = fs.existsSync(functionsPath) ? fs.readFileSync(functionsPath, 'utf-8') : '';
 
-  const hasCommonSpread = /\.\.\.\s*commonFunctions/.test(indexSource);
   const functionExports = extractExports(functionsSource);
   const indexExports = extractExports(indexSource);
+  const allKnown = new Set([...functionExports, ...indexExports]);
+
+  // If commonFunctions is spread, resolve actual exports from CommonFunctions.ts
+  const combined = indexSource + '\n' + functionsSource;
+  if (/commonFunctions/.test(combined)) {
+    for (const probe of [
+      path.join(srcPath, 'CommonFunctions.ts'),
+      path.join(srcPath, 'common', 'CommonFunctions.ts'),
+      path.join(srcPath, '..', 'common', 'CommonFunctions.ts'),
+    ]) {
+      if (fs.existsSync(probe)) {
+        const commonSource = fs.readFileSync(probe, 'utf-8');
+        for (const name of extractExports(commonSource)) {
+          allKnown.add(name);
+        }
+        break;
+      }
+    }
+  }
 
   for (const fn of MANDATORY_FUNCTIONS) {
-    const presentViaSpread = hasCommonSpread;
-    const presentExplicitly = functionExports.has(fn) || indexExports.has(fn);
-
-    if (!presentViaSpread && !presentExplicitly) {
+    if (!allKnown.has(fn)) {
       console.error(
         `   ❌ Mandatory Freesail function removed: ${fn}. Required by the system prompt and cannot be omitted.`
       );
@@ -231,7 +258,29 @@ function validateCatalog(config: CatalogConfig): boolean {
         if (m[1] && /^[A-Z]/.test(m[1])) mapKeys.add(m[1]);
       }
       const allKnown = new Set([...exported, ...mapKeys]);
-
+      // If commonComponents is spread into the map, resolve its actual exports
+      // from CommonComponents.tsx (not the JSON schema — the JSON can be edited
+      // without updating the implementation, so we trust the source file).
+      if (/commonComponents/.test(componentSource)) {
+        for (const probe of [
+          path.join(config.srcPath, 'CommonComponents.tsx'),
+          path.join(config.srcPath, 'common', 'CommonComponents.tsx'),
+          path.join(config.srcPath, '..', 'common', 'CommonComponents.tsx'),
+        ]) {
+          if (fs.existsSync(probe)) {
+            const commonSource = fs.readFileSync(probe, 'utf-8');
+            const commonExports = extractExports(commonSource);
+            for (const name of commonExports) {
+              allKnown.add(name);
+            }
+            // Also scan the commonComponents map object for key names
+            for (const m of commonSource.matchAll(/['"]?(\w+)['"]?\s*:/g)) {
+              if (m[1] && /^[A-Z]/.test(m[1])) allKnown.add(m[1]);
+            }
+            break;
+          }
+        }
+      }
       const missing = jsonComponents.filter((c) => !allKnown.has(c));
       if (missing.length > 0) {
         console.error(`   ❌ Unimplemented components: ${missing.join(', ')}`);
@@ -241,23 +290,50 @@ function validateCatalog(config: CatalogConfig): boolean {
   }
 
   // 3. Check functions: JSON-declared functions have exports (excluding common functions)
-  const jsonFunctions: string[] = Array.isArray(schema['functions'])
-    ? (schema['functions'] as Array<{ name: string }>).map((f) => f.name)
-    : [];
+  const rawFunctions = schema['functions'];
+  const jsonFunctions: string[] = Array.isArray(rawFunctions)
+    ? (rawFunctions as Array<{ name: string }>).map((f) => f.name)
+    : rawFunctions && typeof rawFunctions === 'object'
+      ? Object.keys(rawFunctions)
+      : [];
 
   const functionsPath = path.join(config.srcPath, 'functions.ts');
-  const indexPath = path.join(config.srcPath, 'index.ts');
-  const indexSource = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf-8') : '';
-  const hasCommonSpread = /\.\.\.\s*commonFunctions/.test(indexSource);
 
-  if (jsonFunctions.length > 0 && !hasCommonSpread) {
+  if (jsonFunctions.length > 0) {
     if (!fs.existsSync(functionsPath)) {
       console.error(`   ❌ Missing functions.ts`);
       isOk = false;
     } else {
-      const functionsSource = fs.readFileSync(functionsPath, 'utf-8');
-      const exported = extractExports(functionsSource);
-      const missing = jsonFunctions.filter((f) => !exported.has(f));
+      const fnSource = fs.readFileSync(functionsPath, 'utf-8');
+      const exported = extractExports(fnSource);
+      // Also scan the function map object literal for key names
+      const mapKeys = new Set<string>();
+      for (const m of fnSource.matchAll(/['"]?(\w+)['"]?\s*:/g)) {
+        if (m[1] && /^[a-z]/.test(m[1])) mapKeys.add(m[1]);
+      }
+      const allKnown = new Set([...exported, ...mapKeys]);
+      // If commonFunctions is spread into the map, resolve its actual exports
+      // from CommonFunctions.ts (not the JSON schema).
+      if (/commonFunctions/.test(fnSource)) {
+        for (const probe of [
+          path.join(config.srcPath, 'CommonFunctions.ts'),
+          path.join(config.srcPath, 'common', 'CommonFunctions.ts'),
+          path.join(config.srcPath, '..', 'common', 'CommonFunctions.ts'),
+        ]) {
+          if (fs.existsSync(probe)) {
+            const commonSource = fs.readFileSync(probe, 'utf-8');
+            const commonExports = extractExports(commonSource);
+            for (const name of commonExports) {
+              allKnown.add(name);
+            }
+            for (const m of commonSource.matchAll(/['"]?(\w+)['"]?\s*:/g)) {
+              if (m[1] && /^[a-z]/.test(m[1])) allKnown.add(m[1]);
+            }
+            break;
+          }
+        }
+      }
+      const missing = jsonFunctions.filter((f) => !allKnown.has(f));
       if (missing.length > 0) {
         console.error(`   ❌ Unimplemented functions: ${missing.join(', ')}`);
         isOk = false;
@@ -282,10 +358,25 @@ export function run(): void {
   const catalogs = discoverCatalogs();
 
   if (catalogs.length === 0) {
-    console.error(
-      '❌ No catalogs found. Run this command from a catalog package directory\n' +
-        '   (folder must be named {prefix}_catalog or contain src/{prefix}_catalog.json).'
-    );
+    // Check if decomposed source files exist (user needs to run prepare first)
+    const srcPath = path.join(CWD, 'src');
+    const hasCommonDir =
+      fs.existsSync(path.join(srcPath, 'common')) ||
+      fs.existsSync(path.join(CWD, 'common'));
+    const hasComponentFiles = fs.existsSync(srcPath) &&
+      fs.readdirSync(srcPath).some(f => f === 'components.json');
+
+    if (hasCommonDir || hasComponentFiles) {
+      console.error(
+        '❌ No resolved catalog JSON found, but decomposed source files detected.\n' +
+          '   Run `freesail prepare catalog` first to generate the catalog JSON.'
+      );
+    } else {
+      console.error(
+        '❌ No catalogs found. Run this command from a catalog package directory\n' +
+          '   (folder must be named {prefix}_catalog or contain src/{prefix}_catalog.json).'
+      );
+    }
     process.exit(1);
   }
 

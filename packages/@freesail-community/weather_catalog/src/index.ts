@@ -26,6 +26,7 @@
 
 import type { CatalogDefinition } from '@freesail/react';
 import { weatherCatalogComponents } from './components.js';
+import { weatherCatalogFunctions } from './functions.js';
 import catalogSchema from './weather_catalog.json';
 
 // Re-export all individual components for advanced usage
@@ -51,4 +52,5 @@ export const WeatherCatalog: CatalogDefinition = {
   namespace: WEATHER_CATALOG_ID,
   schema: catalogSchema,
   components: weatherCatalogComponents,
+  functions: weatherCatalogFunctions,
 };
