@@ -557,7 +557,7 @@
         },
         {
           "type": "object",
-          "description": "A text input field for user input. Key properties: label (required), value (data binding for the input's value), variant (shortText/longText/number/obscured), hideLabel (set to true to suppress the label — use this when the TextField is inside a GridLayout where column headers already describe the field).",
+          "description": "A text input field for user input. Key properties: label (required), value (data binding for the input's value), variant (shortText/longText/number/obscured), hideLabel (set to true to suppress the label — use this when the TextField is inside a GridLayout where column headers already describe the field), min/max (numeric bounds, only used when variant is 'number').",
           "properties": {
             "component": {
               "const": "TextField"
@@ -584,6 +584,14 @@
               "type": "boolean",
               "description": "When true, hides the label above the input. Use this when the TextField is inside a GridLayout — the column headers already act as labels, so showing them again inside each cell is redundant and makes rows too tall.",
               "default": false
+            },
+            "min": {
+              "$ref": "./common_types.json#/$defs/DynamicNumber",
+              "description": "Minimum allowed value. Only used when variant is 'number'."
+            },
+            "max": {
+              "$ref": "./common_types.json#/$defs/DynamicNumber",
+              "description": "Maximum allowed value. Only used when variant is 'number'."
             }
           },
           "required": [

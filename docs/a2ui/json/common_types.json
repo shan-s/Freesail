@@ -30,6 +30,11 @@
         },
         "accessibility": {
           "$ref": "#/$defs/AccessibilityAttributes"
+        },
+        "visible": {
+          "$ref": "#/$defs/DynamicBoolean",
+          "description": "Controls whether the component is rendered. Defaults to true. Use a function call to compute dynamically (e.g. show return date only when trip type is round-trip).",
+          "default": true
         }
       },
       "required": ["id"]

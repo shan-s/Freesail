@@ -32,7 +32,6 @@ export function Column({ component, children }: FreesailComponentProps) {
     gap: (component['gap'] as string) ?? '8px',
     padding: (component['padding'] as string) ?? undefined,
     alignItems: (component['align'] as CSSProperties['alignItems']) ?? 'start',
-    flex: component['weight'] ? (component['weight'] as number) : undefined,
   };
 
   return <div style={style}>{children}</div>;
@@ -62,6 +61,7 @@ export function Card({ component, children }: FreesailComponentProps) {
     boxShadow: 'var(--freesail-shadow-sm)',
     background: getSemanticBackground(component['background'] as string) ?? 'var(--freesail-bg-surface, #ffffff)',
     color: getSemanticColor(component['color'] as string) ?? 'var(--freesail-text-main, #0f172a)',
+    alignSelf: 'stretch',
   };
 
   return <div style={style}>{children}</div>;
@@ -320,6 +320,8 @@ export function TextField({ component, onAction, onDataChange }: FreesailCompone
   const placeholder = (component['placeholder'] as string) ?? label;
   const variant = (component['variant'] as string) ?? 'shortText';
   const value = (component['value'] as string) ?? '';
+  const min = component['min'] as number | undefined;
+  const max = component['max'] as number | undefined;
 
   const checks = (component['checks'] as any[]) ?? [];
   const validationError = validateChecks(checks);
@@ -379,6 +381,8 @@ export function TextField({ component, onAction, onDataChange }: FreesailCompone
           placeholder={placeholder}
           value={value}
           onChange={handleChange}
+          min={variant === 'number' ? min : undefined}
+          max={variant === 'number' ? max : undefined}
           style={inputStyle}
         />
       )}

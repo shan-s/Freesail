@@ -232,6 +232,11 @@ function renderComponent(
   // Resolve data bindings in component properties
   const resolvedProps = resolveDataBindings(componentDef, dataModel, catalogId, scopeData, scopeBasePath);
 
+  // Visibility check: if `visible` resolves to exactly false, skip rendering.
+  if (resolvedProps['visible'] === false) {
+    return null;
+  }
+
   // Build props
   const props: FreesailComponentProps = {
     component: { ...componentDef, ...resolvedProps },

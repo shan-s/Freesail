@@ -43,7 +43,7 @@ export function Row({ component, children }: FreesailComponentProps) {
     flexDirection: 'row',
     gap: (component['gap'] as string) ?? '8px',
     padding: (component['padding'] as string) ?? undefined,
-    alignItems: (component['align'] as CSSProperties['alignItems']) ?? 'center',
+    alignItems: (component['align'] as CSSProperties['alignItems']) ?? 'start',
     justifyContent: mapJustify(component['justify'] as string),
     flexWrap: (component['wrap'] as CSSProperties['flexWrap']) ?? 'nowrap',
   };
@@ -320,6 +320,8 @@ export function TextField({ component, onAction, onDataChange }: FreesailCompone
   const placeholder = (component['placeholder'] as string) ?? label;
   const variant = (component['variant'] as string) ?? 'shortText';
   const value = (component['value'] as string) ?? '';
+  const min = component['min'] as number | undefined;
+  const max = component['max'] as number | undefined;
 
   const checks = (component['checks'] as any[]) ?? [];
   const validationError = validateChecks(checks);
@@ -379,6 +381,8 @@ export function TextField({ component, onAction, onDataChange }: FreesailCompone
           placeholder={placeholder}
           value={value}
           onChange={handleChange}
+          min={variant === 'number' ? min : undefined}
+          max={variant === 'number' ? max : undefined}
           style={inputStyle}
         />
       )}

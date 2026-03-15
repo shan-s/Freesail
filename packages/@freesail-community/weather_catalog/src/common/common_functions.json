@@ -11,6 +11,7 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -24,9 +25,11 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           },
           {
+            "name": "pattern",
             "type": "string",
             "description": "The regex pattern to match against."
           }
@@ -41,9 +44,11 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           },
           {
+            "name": "constraints",
             "type": "object",
             "properties": {
               "min": {
@@ -81,6 +86,7 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -95,9 +101,11 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           },
           {
+            "name": "constraints",
             "type": "object",
             "properties": {
               "min": {
@@ -133,6 +141,7 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -146,6 +155,7 @@
         "type": "array",
         "items": [
           {
+            "name": "format",
             "description": "The format string.",
             "type": "string"
           }
@@ -163,14 +173,17 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicNumber",
             "description": "The number to format."
           },
           {
+            "name": "fractionDigits",
             "$ref": "./common_types.json#/$defs/DynamicNumber",
             "description": "Optional. The number of decimal places to show. Defaults to 0 or 2 depending on locale."
           },
           {
+            "name": "useGrouping",
             "$ref": "./common_types.json#/$defs/DynamicBoolean",
             "description": "Optional. If true, uses locale-specific grouping separators (e.g. '1,000'). If false, returns raw digits (e.g. '1000'). Defaults to true."
           }
@@ -185,10 +198,12 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicNumber",
             "description": "The monetary amount."
           },
           {
+            "name": "currency",
             "$ref": "./common_types.json#/$defs/DynamicString",
             "description": "The ISO 4217 currency code (e.g., 'USD', 'EUR')."
           }
@@ -203,10 +218,12 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicValue",
             "description": "The date to format."
           },
           {
+            "name": "pattern",
             "$ref": "./common_types.json#/$defs/DynamicString",
             "description": "A Unicode TR35 date pattern string.\n\nToken Reference:\n- Year: 'yy' (26), 'yyyy' (2026)\n- Month: 'M' (1), 'MM' (01), 'MMM' (Jan), 'MMMM' (January)\n- Day: 'd' (1), 'dd' (01), 'E' (Tue), 'EEEE' (Tuesday)\n- Hour (12h): 'h' (1-12), 'hh' (01-12) - requires 'a' for AM/PM\n- Hour (24h): 'H' (0-23), 'HH' (00-23) - Military Time\n- Minute: 'mm' (00-59)\n- Second: 'ss' (00-59)\n- Period: 'a' (AM/PM)\n\nExamples:\n- 'MMM dd, yyyy' -> 'Jan 16, 2026'\n- 'HH:mm' -> '14:30' (Military)\n- 'h:mm a' -> '2:30 PM'\n- 'EEEE, d MMMM' -> 'Friday, 16 January'"
           }
@@ -221,10 +238,12 @@
         "type": "array",
         "items": [
           {
+            "name": "count",
             "$ref": "./common_types.json#/$defs/DynamicNumber",
             "description": "The numeric value used to determine the plural category."
           },
           {
+            "name": "forms",
             "type": "object",
             "description": "A map of CLDR plural categories to their corresponding strings.",
             "properties": {
@@ -301,6 +320,7 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -337,6 +357,7 @@
         "type": "array",
         "items": [
           {
+            "name": "value",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -351,9 +372,11 @@
         "type": "array",
         "items": [
           {
+            "name": "a",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           },
           {
+            "name": "b",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -368,9 +391,11 @@
         "type": "array",
         "items": [
           {
+            "name": "a",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           },
           {
+            "name": "b",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -385,9 +410,11 @@
         "type": "array",
         "items": [
           {
+            "name": "a",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           },
           {
+            "name": "b",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -402,9 +429,11 @@
         "type": "array",
         "items": [
           {
+            "name": "a",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           },
           {
+            "name": "b",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -419,9 +448,11 @@
         "type": "array",
         "items": [
           {
+            "name": "a",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           },
           {
+            "name": "b",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
@@ -436,9 +467,11 @@
         "type": "array",
         "items": [
           {
+            "name": "a",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           },
           {
+            "name": "b",
             "$ref": "./common_types.json#/$defs/DynamicValue"
           }
         ],
