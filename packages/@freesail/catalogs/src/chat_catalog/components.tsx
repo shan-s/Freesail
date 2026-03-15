@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useRef, useEffect, type CSSProperties } from 'react';
+import ReactMarkdown from 'react-markdown';
 import type { FreesailComponentProps } from '@freesail/react';
 
 // =============================================================================
@@ -94,7 +95,7 @@ export function ChatMessageList({ children }: FreesailComponentProps) {
     <div style={style}>
       {hasChildren ? children : (
         <div style={{ color: 'var(--freesail-text-muted, #64748b)', textAlign: 'center', marginTop: '40px' }}>
-          <p>Ask the agent to create UI components!</p>
+          <p>Ask the agent anything!</p>
           <p style={{ fontSize: '13px', marginTop: '8px' }}>
             Try: &quot;Show me a welcome card&quot; or &quot;Create a counter&quot;
           </p>
@@ -134,7 +135,7 @@ export function ChatMessage({ component, scopeData }: FreesailComponentProps) {
     color: isUser ? 'var(--freesail-primary-text, #ffffff)' : 'var(--freesail-text-main, #0f172a)',
     fontSize: '14px',
     lineHeight: '1.5',
-    whiteSpace: 'pre-wrap',
+    whiteSpace: isUser ? 'pre-wrap' : undefined,
     wordBreak: 'break-word',
     boxShadow: 'var(--freesail-shadow-sm)',
   };
@@ -149,7 +150,15 @@ export function ChatMessage({ component, scopeData }: FreesailComponentProps) {
 
   return (
     <div style={containerStyle}>
-      <div style={bubbleStyle}>{content}</div>
+      <div style={bubbleStyle}>
+        {isUser ? content : (
+          <div className="freesail-chat-md" style={{
+            whiteSpace: 'normal',
+          }}>
+            <ReactMarkdown>{content}</ReactMarkdown>
+          </div>
+        )}
+      </div>
       {timestamp && (
         <span style={timeStyle}>
           {formatTime(timestamp)}
@@ -370,14 +379,17 @@ export function AgentStream({ component }: FreesailComponentProps) {
     color: 'var(--freesail-text-main, #0f172a)',
     fontSize: '14px',
     lineHeight: '1.5',
-    whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
     boxShadow: 'var(--freesail-shadow-sm)',
   };
 
   return (
     <div style={containerStyle}>
-      <div style={bubbleStyle}>{display}</div>
+      <div style={bubbleStyle}>
+        <div className="freesail-chat-md">
+          <ReactMarkdown>{display}</ReactMarkdown>
+        </div>
+      </div>
     </div>
   );
 }

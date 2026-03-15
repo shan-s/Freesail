@@ -5,11 +5,10 @@
  * to enable AI agents to drive the UI using the A2UI v0.9 protocol.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {ReactUI} from 'freesail';
 import {ChatCatalog,StandardCatalog} from '@freesail/catalogs';
 import { WeatherCatalog } from '@freesail-community/weathercatalog';
-
 
 const CHAT_CATALOG_ID = 'https://freesail.dev/catalogs/chat_catalog_v1.json';
 
@@ -57,8 +56,40 @@ const customThemeProps: Partial<ReactUI.FreesailThemeTokens> = {
 /**
  * Main App component.
  */
+const MIN_CHAT_WIDTH = 260;
+const MAX_CHAT_WIDTH = 700;
+const DEFAULT_CHAT_WIDTH = 380;
+
 function App() {
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'custom'>('light');
+  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(DEFAULT_CHAT_WIDTH);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    isDragging.current = true;
+    startX.current = e.clientX;
+    startWidth.current = chatWidth;
+    e.preventDefault();
+  }, [chatWidth]);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const newWidth = startWidth.current + (e.clientX - startX.current);
+      setChatWidth(Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, newWidth)));
+    };
+    const onMouseUp = () => {
+      isDragging.current = false;
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   const activeTheme = themeMode === 'custom' ? customThemeProps : themeMode;
 
@@ -77,11 +108,27 @@ function App() {
           }}
         >
           <ChatBootstrapper />
-          <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0, userSelect: isDragging.current ? 'none' : 'auto' }}>
             {/* Chat Surface — rendered by the agent via A2UI */}
-            <div style={{ width: '380px', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: `${chatWidth}px`, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
               <ReactUI.FreesailSurface surfaceId="__chat" />
             </div>
+
+            {/* Drag Handle */}
+              <div
+                onMouseDown={onMouseDown}
+                style={{
+                  width: '2px',
+                  cursor: 'col-resize',
+                  background: 'var(--freesail-border, rgba(128,128,128,0.4))',
+                  flexShrink: 0,
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--freesail-primary, #3b82f6)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--freesail-border, rgba(128,128,128,0.4))')}
+                tabIndex={0}
+                aria-label="Resize chat panel"
+              />
 
             {/* Main Content */}
             <div style={{
@@ -93,7 +140,7 @@ function App() {
             }}>
               <header style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <h1 style={{ margin: 0, fontSize: '24px' }}>Freesail Demo</h1>
+                  <h1 style={{ margin: 0, fontSize: '24px' }}>Freesail</h1>
                   <ConnectionIndicator />
                 </div>
                 
@@ -160,7 +207,7 @@ function ChatBootstrapper() {
       {
         id: 'root',
         component: 'ChatContainer',
-        title: 'Chat with AI Agent',
+        title: 'Chat',
         height: '100%',
         children: ['message_list', 'agent_stream', 'typing', 'chat_input'],
       },

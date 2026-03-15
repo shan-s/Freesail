@@ -11,6 +11,44 @@ import ReactMarkdown from 'react-markdown';
 import type { FreesailComponentProps } from '@freesail/react';
 import { commonComponents, getSemanticColor, validateChecks } from '../common/CommonComponents.js';
 
+// =============================================================================
+// Shared Chart Helpers
+// =============================================================================
+
+const defaultPalette = [
+  '#2563eb', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6',
+];
+
+interface DataPoint {
+  label: string;
+  value: number;
+  color?: string;
+}
+
+function parseData(raw: unknown): DataPoint[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item: Record<string, unknown>) => ({
+    label: String(item['label'] ?? ''),
+    value: Number(item['value'] ?? 0),
+    color: item['color'] != null ? String(item['color']) : undefined,
+  }));
+}
+
+function ChartTitle({ title }: { title?: string }) {
+  if (!title) return null;
+  return (
+    <div style={{
+      fontSize: '14px',
+      fontWeight: 600,
+      color: 'var(--freesail-text-main, #0f172a)',
+      marginBottom: '12px',
+    }}>
+      {title}
+    </div>
+  );
+}
+
 /** Sanitize a string for safe use in CSS class names / values. */
 function sanitizeCssIdent(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -47,10 +85,22 @@ export function GridLayout({ component, children }: FreesailComponentProps) {
   const headers = (component['headers'] as string[]) ?? [];
   const colCount = headers.length || 1;
   const childArray = Array.isArray(children) ? children : children ? [children] : [];
+  const columnWeights = (component['columnWeights'] as number[]) ?? [];
 
   // Unique class scoped to this grid instance for CSS targeting
   const gridClass = `freesail-grid-${sanitizeCssIdent(String(component['id'] ?? 'default'))}`;
   const rowPadding = sanitizeCssValue((component['rowPadding'] as string) ?? '10px 16px');
+
+  // Build grid-template-columns from weights or fall back to equal sizing
+  let gridCols: string;
+  if (columnWeights.length > 0) {
+    gridCols = Array.from({ length: colCount }, (_, i) => {
+      const w = columnWeights[i] ?? 1;
+      return `minmax(min-content, ${w}fr)`;
+    }).join(' ');
+  } else {
+    gridCols = `repeat(${colCount}, minmax(min-content, 1fr))`;
+  }
 
   const wrapperStyle: CSSProperties = {
     width: '100%',
@@ -61,7 +111,7 @@ export function GridLayout({ component, children }: FreesailComponentProps) {
 
   const gridStyle: CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: `repeat(${colCount}, minmax(min-content, 1fr))`,
+    gridTemplateColumns: gridCols,
     minWidth: '100%',
     fontSize: '14px',
     color: 'var(--freesail-text-main, #0f172a)',
@@ -84,22 +134,27 @@ export function GridLayout({ component, children }: FreesailComponentProps) {
       {/* Make the Row wrapper and its flex div transparent to the grid */}
       <style>{`
         .${gridClass} > .freesail-grid-row,
-        .${gridClass} > .freesail-grid-row > div {
+        .${gridClass} > .freesail-grid-row > div,
+        .${gridClass} > .freesail-grid-row [data-freesail-weight] {
           display: contents !important;
         }
-        .${gridClass} > .freesail-grid-row > div > * {
+        .${gridClass} > .freesail-grid-row > div > *,
+        .${gridClass} > .freesail-grid-row > div > [data-freesail-weight] > * {
           padding: ${rowPadding};
           border-bottom: 1px solid var(--freesail-border, #e2e8f0);
         }
-        .${gridClass} > .freesail-grid-row > div > button {
+        .${gridClass} > .freesail-grid-row > div > button,
+        .${gridClass} > .freesail-grid-row > div > [data-freesail-weight] > button {
           width: fit-content;
           align-self: center;
           justify-self: start;
         }
-        .${gridClass} > .freesail-grid-row:nth-child(odd) > div > * {
+        .${gridClass} > .freesail-grid-row:nth-child(odd) > div > *,
+        .${gridClass} > .freesail-grid-row:nth-child(odd) > div > [data-freesail-weight] > * {
           background: var(--freesail-bg-surface, #ffffff);
         }
-        .${gridClass} > .freesail-grid-row:nth-child(even) > div > * {
+        .${gridClass} > .freesail-grid-row:nth-child(even) > div > *,
+        .${gridClass} > .freesail-grid-row:nth-child(even) > div > [data-freesail-weight] > * {
           background: var(--freesail-bg-muted, #f8fafc);
         }
       `}</style>
@@ -604,10 +659,413 @@ export function Dropdown({ component, onDataChange }: FreesailComponentProps) {
 }
 
 // =============================================================================
+// Chart Components
+// =============================================================================
+
+/**
+ * BarChart - renders vertical or horizontal bar charts from data points.
+ */
+export function BarChart({ component }: FreesailComponentProps) {
+  const title = component['title'] as string | undefined;
+  const data = parseData(component['data']);
+  const orientation = (component['orientation'] as string) ?? 'vertical';
+  const defaultColor = (component['color'] as string) ?? '#2563eb';
+  const showValues = component['showValues'] !== false;
+  const height = Number(component['height'] ?? 300);
+
+  if (data.length === 0) {
+    return <div style={{ color: 'var(--freesail-text-muted, #64748b)', fontSize: '14px' }}>No chart data</div>;
+  }
+
+  const maxVal = Math.max(...data.map(d => d.value), 1);
+
+  if (orientation === 'horizontal') {
+    const barHeight = 28;
+    const gap = 8;
+    const labelWidth = 100;
+    const svgHeight = data.length * (barHeight + gap) - gap;
+    const chartWidth = 300;
+
+    return (
+      <div>
+        <ChartTitle title={title} />
+        <svg width="100%" height={Math.min(svgHeight, height)} viewBox={`0 0 ${labelWidth + chartWidth + 60} ${svgHeight}`}
+          preserveAspectRatio="xMinYMin meet" style={{ overflow: 'visible' }}>
+          {data.map((d, i) => {
+            const y = i * (barHeight + gap);
+            const barW = (d.value / maxVal) * chartWidth;
+            const fill = d.color ?? defaultColor;
+            return (
+              <g key={i}>
+                <text x={labelWidth - 8} y={y + barHeight / 2} textAnchor="end"
+                  dominantBaseline="central" fontSize="12"
+                  fill="var(--freesail-text-muted, #64748b)">
+                  {d.label}
+                </text>
+                <rect x={labelWidth} y={y} width={barW} height={barHeight}
+                  rx={4} fill={fill} opacity={0.85} />
+                {showValues && (
+                  <text x={labelWidth + barW + 6} y={y + barHeight / 2}
+                    dominantBaseline="central" fontSize="12" fontWeight="500"
+                    fill="var(--freesail-text-main, #0f172a)">
+                    {d.value.toLocaleString()}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    );
+  }
+
+  // Vertical orientation
+  const padding = { top: 16, right: 16, bottom: 40, left: 48 };
+  const svgWidth = 500;
+  const chartW = svgWidth - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+  const barWidth = Math.min(40, (chartW / data.length) * 0.6);
+  const step = chartW / data.length;
+
+  // Y-axis gridlines
+  const gridLines = 4;
+  const gridVals = Array.from({ length: gridLines + 1 }, (_, i) =>
+    Math.round((maxVal / gridLines) * i));
+
+  return (
+    <div>
+      <ChartTitle title={title} />
+      <svg width="100%" height={height} viewBox={`0 0 ${svgWidth} ${height}`}
+        preserveAspectRatio="xMinYMin meet" style={{ overflow: 'visible' }}>
+        {/* Grid lines */}
+        {gridVals.map((v, i) => {
+          const y = padding.top + chartH - (v / maxVal) * chartH;
+          return (
+            <g key={`grid-${i}`}>
+              <line x1={padding.left} y1={y} x2={svgWidth - padding.right} y2={y}
+                stroke="var(--freesail-border, #e2e8f0)" strokeWidth={1} />
+              <text x={padding.left - 8} y={y} textAnchor="end" dominantBaseline="central"
+                fontSize="11" fill="var(--freesail-text-muted, #64748b)">
+                {v.toLocaleString()}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Bars */}
+        {data.map((d, i) => {
+          const x = padding.left + i * step + (step - barWidth) / 2;
+          const barH = (d.value / maxVal) * chartH;
+          const y = padding.top + chartH - barH;
+          const fill = d.color ?? defaultColor;
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={barWidth} height={barH} rx={3}
+                fill={fill} opacity={0.85} />
+              {showValues && (
+                <text x={x + barWidth / 2} y={y - 6} textAnchor="middle"
+                  fontSize="11" fontWeight="500"
+                  fill="var(--freesail-text-main, #0f172a)">
+                  {d.value.toLocaleString()}
+                </text>
+              )}
+              <text x={x + barWidth / 2} y={padding.top + chartH + 16}
+                textAnchor="middle" fontSize="11"
+                fill="var(--freesail-text-muted, #64748b)">
+                {d.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * LineChart - renders a line chart with optional area fill and dots.
+ */
+export function LineChart({ component }: FreesailComponentProps) {
+  const title = component['title'] as string | undefined;
+  const data = parseData(component['data']);
+  const color = (component['color'] as string) ?? '#2563eb';
+  const showDots = component['showDots'] !== false;
+  const showArea = component['showArea'] === true;
+  const height = Number(component['height'] ?? 300);
+
+  if (data.length < 2) {
+    return <div style={{ color: 'var(--freesail-text-muted, #64748b)', fontSize: '14px' }}>Need at least 2 data points</div>;
+  }
+
+  const padding = { top: 16, right: 16, bottom: 40, left: 48 };
+  const svgWidth = 500;
+  const chartW = svgWidth - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+
+  const maxVal = Math.max(...data.map(d => d.value), 1);
+  const minVal = Math.min(...data.map(d => d.value), 0);
+  const range = maxVal - minVal || 1;
+
+  const points = data.map((d, i) => ({
+    x: padding.left + (i / (data.length - 1)) * chartW,
+    y: padding.top + chartH - ((d.value - minVal) / range) * chartH,
+  }));
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+  const areaPath = linePath +
+    ` L${points[points.length - 1]!.x},${padding.top + chartH}` +
+    ` L${points[0]!.x},${padding.top + chartH} Z`;
+
+  // Grid
+  const gridLines = 4;
+  const gridVals = Array.from({ length: gridLines + 1 }, (_, i) =>
+    minVal + (range / gridLines) * i);
+
+  return (
+    <div>
+      <ChartTitle title={title} />
+      <svg width="100%" height={height} viewBox={`0 0 ${svgWidth} ${height}`}
+        preserveAspectRatio="xMinYMin meet" style={{ overflow: 'visible' }}>
+        <defs>
+          <linearGradient id={`area-grad-${color.replace(/[^a-zA-Z0-9]/g, '')}`}
+            x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+            <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+
+        {/* Grid lines */}
+        {gridVals.map((v, i) => {
+          const y = padding.top + chartH - ((v - minVal) / range) * chartH;
+          return (
+            <g key={`grid-${i}`}>
+              <line x1={padding.left} y1={y} x2={svgWidth - padding.right} y2={y}
+                stroke="var(--freesail-border, #e2e8f0)" strokeWidth={1} />
+              <text x={padding.left - 8} y={y} textAnchor="end" dominantBaseline="central"
+                fontSize="11" fill="var(--freesail-text-muted, #64748b)">
+                {Math.round(v).toLocaleString()}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Area fill */}
+        {showArea && (
+          <path d={areaPath}
+            fill={`url(#area-grad-${color.replace(/[^a-zA-Z0-9]/g, '')})`} />
+        )}
+
+        {/* Line */}
+        <path d={linePath} fill="none" stroke={color} strokeWidth={2.5}
+          strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Dots */}
+        {showDots && points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={4}
+            fill="white" stroke={color} strokeWidth={2} />
+        ))}
+
+        {/* X-axis labels */}
+        {data.map((d, i) => {
+          const x = padding.left + (i / (data.length - 1)) * chartW;
+          // Show every label if ≤ 10 points, otherwise thin them out
+          if (data.length > 10 && i % Math.ceil(data.length / 10) !== 0 && i !== data.length - 1) return null;
+          return (
+            <text key={`label-${i}`} x={x} y={padding.top + chartH + 16}
+              textAnchor="middle" fontSize="11"
+              fill="var(--freesail-text-muted, #64748b)">
+              {d.label}
+            </text>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * PieChart - renders a pie or donut chart.
+ */
+export function PieChart({ component }: FreesailComponentProps) {
+  const title = component['title'] as string | undefined;
+  const data = parseData(component['data']);
+  const donut = component['donut'] === true;
+  const size = Number(component['size'] ?? 250);
+
+  if (data.length === 0) {
+    return <div style={{ color: 'var(--freesail-text-muted, #64748b)', fontSize: '14px' }}>No chart data</div>;
+  }
+
+  const total = data.reduce((sum, d) => sum + Math.abs(d.value), 0) || 1;
+  const cx = size / 2;
+  const cy = size / 2;
+  const outerR = size / 2 - 4;
+  const innerR = donut ? outerR * 0.55 : 0;
+
+  // Build arc segments
+  let currentAngle = -Math.PI / 2; // start at top
+  const segments = data.map((d, i) => {
+    const fraction = Math.abs(d.value) / total;
+    const angle = fraction * 2 * Math.PI;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + angle;
+    currentAngle = endAngle;
+
+    const largeArc = angle > Math.PI ? 1 : 0;
+    const x1 = cx + outerR * Math.cos(startAngle);
+    const y1 = cy + outerR * Math.sin(startAngle);
+    const x2 = cx + outerR * Math.cos(endAngle);
+    const y2 = cy + outerR * Math.sin(endAngle);
+
+    let path: string;
+    if (innerR > 0) {
+      const ix1 = cx + innerR * Math.cos(endAngle);
+      const iy1 = cy + innerR * Math.sin(endAngle);
+      const ix2 = cx + innerR * Math.cos(startAngle);
+      const iy2 = cy + innerR * Math.sin(startAngle);
+      path = `M${x1},${y1} A${outerR},${outerR} 0 ${largeArc} 1 ${x2},${y2}` +
+        ` L${ix1},${iy1} A${innerR},${innerR} 0 ${largeArc} 0 ${ix2},${iy2} Z`;
+    } else {
+      path = `M${cx},${cy} L${x1},${y1} A${outerR},${outerR} 0 ${largeArc} 1 ${x2},${y2} Z`;
+    }
+
+    return {
+      path,
+      color: d.color ?? defaultPalette[i % defaultPalette.length],
+      label: d.label,
+      value: d.value,
+      percentage: Math.round(fraction * 100),
+    };
+  });
+
+  return (
+    <div>
+      <ChartTitle title={title} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {segments.map((seg, i) => (
+            <path key={i} d={seg.path} fill={seg.color} stroke="white" strokeWidth={2} />
+          ))}
+        </svg>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {segments.map((seg, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+              <div style={{
+                width: '12px', height: '12px', borderRadius: '2px',
+                backgroundColor: seg.color, flexShrink: 0,
+              }} />
+              <span style={{ color: 'var(--freesail-text-main, #0f172a)' }}>{seg.label}</span>
+              <span style={{ color: 'var(--freesail-text-muted, #64748b)' }}>
+                {seg.percentage}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Sparkline - compact inline sparkline chart.
+ */
+export function Sparkline({ component }: FreesailComponentProps) {
+  const values = (component['values'] as number[]) ?? [];
+  const color = (component['color'] as string) ?? '#2563eb';
+  const width = Number(component['width'] ?? 120);
+  const height = Number(component['height'] ?? 32);
+
+  if (!Array.isArray(values) || values.length < 2) {
+    return <div style={{ width, height }} />;
+  }
+
+  const nums = values.map(Number);
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const range = max - min || 1;
+  const pad = 2;
+
+  const points = nums.map((v, i) => ({
+    x: pad + (i / (nums.length - 1)) * (width - pad * 2),
+    y: pad + (1 - (v - min) / range) * (height - pad * 2),
+  }));
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}
+      style={{ display: 'block' }}>
+      <path d={linePath} fill="none" stroke={color} strokeWidth={1.5}
+        strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={points[points.length - 1]!.x} cy={points[points.length - 1]!.y}
+        r={2.5} fill={color} />
+    </svg>
+  );
+}
+
+/**
+ * StatCard - KPI / summary statistic card with trend indicator.
+ */
+export function StatCard({ component, children }: FreesailComponentProps) {
+  const label = (component['label'] as string) ?? '';
+  const value = (component['value'] as string) ?? '';
+  const trend = component['trend'] as string | undefined;
+  const trendValue = component['trendValue'] as string | undefined;
+  const accentColor = (component['color'] as string) ?? 'var(--freesail-primary, #2563eb)';
+
+  const defaultTrendColor = trend === 'up' ? '#10b981' : trend === 'down' ? '#ef4444' : 'var(--freesail-text-muted, #64748b)';
+  const trendColor = (component['trendColor'] as string) ?? defaultTrendColor;
+  const trendArrow = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→';
+
+  const cardStyle: CSSProperties = {
+    flex: '1 1 0',
+    minWidth: '140px',
+    padding: '16px 20px',
+    borderRadius: '12px',
+    border: '1px solid var(--freesail-border, #e2e8f0)',
+    backgroundColor: 'var(--freesail-bg-card, #ffffff)',
+    borderLeft: `4px solid ${accentColor}`,
+  };
+
+  return (
+    <div style={cardStyle}>
+      <div style={{
+        fontSize: '13px',
+        color: 'var(--freesail-text-muted, #64748b)',
+        marginBottom: '4px',
+      }}>{label}</div>
+      <div style={{
+        fontSize: '28px',
+        fontWeight: 700,
+        color: 'var(--freesail-text-main, #0f172a)',
+        lineHeight: 1.2,
+        minHeight: '1.2em',
+      }}>{value || '\u00A0'}</div>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        marginTop: '6px',
+        fontSize: '14px',
+        fontWeight: 600,
+        color: trendColor,
+        visibility: (trend || trendValue) ? 'visible' : 'hidden',
+      }}>
+        <span style={{ fontSize: '16px', lineHeight: 1 }}>{trendArrow}</span>
+        {trendValue && <span>{trendValue}</span>}
+        {/* Reserve space when no trend data */}
+        {!trendValue && <span>&nbsp;</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// =============================================================================
 // Export catalog components map
 // =============================================================================
 
-export const standardCatalogComponents = {
+export const standardCatalogComponents: Record<string, React.ComponentType<FreesailComponentProps>> = {
   ...commonComponents,
   GridLayout,
   Markdown,
@@ -620,4 +1078,9 @@ export const standardCatalogComponents = {
   AudioPlayer,
   Slider,
   Dropdown,
+  BarChart,
+  LineChart,
+  PieChart,
+  Sparkline,
+  StatCard,
 };

@@ -62,6 +62,8 @@ export interface SurfaceError {
 export interface SurfaceManagerEvents {
   surfaceCreated: (surface: Surface) => void;
   surfaceDeleted: (surfaceId: SurfaceId) => void;
+  /** Fired when a surface has not received updateComponents within the orphan timeout */
+  surfaceOrphan: (surfaceId: SurfaceId) => void;
   componentsUpdated: (surfaceId: SurfaceId, components: A2UIComponent[]) => void;
   dataModelUpdated: (surfaceId: SurfaceId, path: JsonPointer, value: unknown) => void;
   error: (error: SurfaceError) => void;
@@ -78,6 +80,10 @@ export class SurfaceManager {
     keyof SurfaceManagerEvents,
     Set<EventCallback<keyof SurfaceManagerEvents>>
   > = new Map();
+  /** Timers for auto-deleting surfaces that never receive updateComponents */
+  private orphanTimers: Map<SurfaceId, ReturnType<typeof setTimeout>> = new Map();
+  /** How long (ms) to wait for updateComponents before deleting a new surface (default: 30s) */
+  orphanTimeout = 30_000;
 
   /**
    * Create a new surface.
@@ -112,6 +118,22 @@ export class SurfaceManager {
     this.surfaces.set(surfaceId, surface);
     this.emit('surfaceCreated', surface);
 
+    // Start orphan timer — if updateComponents isn't called within the
+    // timeout, emit a surfaceOrphan event so the client can remind the
+    // agent to clean up. Client-managed surfaces (__) are exempt.
+    if (!surfaceId.startsWith('__') && this.orphanTimeout > 0) {
+      this.orphanTimers.get(surfaceId) && clearTimeout(this.orphanTimers.get(surfaceId)!);
+      const timer = setTimeout(() => {
+        this.orphanTimers.delete(surfaceId);
+        const s = this.surfaces.get(surfaceId);
+        if (s && s.components.size === 0) {
+          console.warn(`[Freesail] Surface '${String(surfaceId)}' has no components after ${this.orphanTimeout}ms — notifying agent`);
+          this.emit('surfaceOrphan', surfaceId);
+        }
+      }, this.orphanTimeout);
+      this.orphanTimers.set(surfaceId, timer);
+    }
+
     return surface;
   }
 
@@ -123,6 +145,13 @@ export class SurfaceManager {
     if (!surface) {
       this.emitSurfaceNotFoundError(surfaceId, 'deleteSurface');
       return false;
+    }
+
+    // Cancel any pending orphan timer
+    const orphanTimer = this.orphanTimers.get(surfaceId);
+    if (orphanTimer) {
+      clearTimeout(orphanTimer);
+      this.orphanTimers.delete(surfaceId);
     }
 
     this.surfaces.delete(surfaceId);
@@ -181,6 +210,13 @@ export class SurfaceManager {
 
     surface.updatedAt = Date.now();
     this.emit('componentsUpdated', surfaceId, components);
+
+    // Surface received components — cancel orphan timer
+    const orphanTimer = this.orphanTimers.get(surfaceId);
+    if (orphanTimer) {
+      clearTimeout(orphanTimer);
+      this.orphanTimers.delete(surfaceId);
+    }
 
     return true;
   }
@@ -296,6 +332,8 @@ export class SurfaceManager {
   dispose(): void {
     this.surfaces.clear();
     this.listeners.clear();
+    for (const timer of this.orphanTimers.values()) clearTimeout(timer);
+    this.orphanTimers.clear();
   }
 
   // ==========================================================================

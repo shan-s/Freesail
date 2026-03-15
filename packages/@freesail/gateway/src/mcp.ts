@@ -641,7 +641,7 @@ export async function runMCPServerHTTP(options: MCPHTTPServerOptions): Promise<v
   const server = createMCPServer(options);
   const app = express();
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '5mb' }));
 
   // Track transports by session ID for cleanup
   const transports: Record<string, InstanceType<typeof StreamableHTTPServerTransport>> = {};

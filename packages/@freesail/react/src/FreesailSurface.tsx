@@ -249,7 +249,15 @@ function renderComponent(
   };
 
   try {
-    return <Component key={keyOverride ?? componentId} {...props} />;
+    const rendered = <Component key={keyOverride ?? componentId} {...props} />;
+    // Apply weight as flex when the component has a weight property.
+    // Uses a data attribute so parent layouts (e.g. GridLayout) can override
+    // with display:contents if needed.
+    const weight = componentDef['weight'] as number | undefined;
+    if (weight != null) {
+      return <div key={keyOverride ?? componentId} data-freesail-weight style={{ flex: weight, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{rendered}</div>;
+    }
+    return rendered;
   } catch (err) {
     console.error(`[Freesail] Component render error (${componentDef.component}):`, err);
     return <UnknownComponent component={componentDef} />;

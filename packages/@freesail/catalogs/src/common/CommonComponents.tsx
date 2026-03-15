@@ -107,7 +107,6 @@ export function Column({ component, children }: FreesailComponentProps) {
     gap: (component['gap'] as string) ?? '8px',
     padding: (component['padding'] as string) ?? undefined,
     alignItems: (component['align'] as CSSProperties['alignItems']) ?? 'start',
-    flex: component['weight'] ? (component['weight'] as number) : undefined,
   };
 
   return <div style={style}>{children}</div>;

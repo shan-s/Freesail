@@ -1291,6 +1291,343 @@
         }
       ],
       "unevaluatedProperties": false
+    },
+    "BarChart": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a bar chart from an array of data points. Each data point has a label and value. The chart auto-scales to fit. Use orientation 'horizontal' for long labels or many categories.",
+          "properties": {
+            "component": {
+              "const": "BarChart"
+            },
+            "title": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Optional chart title displayed above the chart."
+            },
+            "data": {
+              "description": "Array of data points. Each item has a 'label' (string) and 'value' (number), and optionally a 'color' (CSS color string) to override the default bar color for that item.",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      },
+                      "color": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ]
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "orientation": {
+              "type": "string",
+              "description": "Bar direction. 'vertical' = bars grow upward, 'horizontal' = bars grow rightward.",
+              "enum": [
+                "vertical",
+                "horizontal"
+              ],
+              "default": "vertical"
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Default bar color (CSS). Individual data items can override with their own 'color'."
+            },
+            "showValues": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "Whether to display the numeric value on each bar.",
+              "default": true
+            },
+            "height": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Chart height in pixels.",
+              "default": 300
+            }
+          },
+          "required": [
+            "component",
+            "data"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "LineChart": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a line chart from an array of data points. Supports optional area fill and data point dots. Good for showing trends over time.",
+          "properties": {
+            "component": {
+              "const": "LineChart"
+            },
+            "title": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Optional chart title displayed above the chart."
+            },
+            "data": {
+              "description": "Array of data points. Each item has a 'label' (string) and 'value' (number).",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ]
+                  },
+                  "minItems": 2
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Line color (CSS).",
+              "default": "#2563eb"
+            },
+            "showDots": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "Whether to show data point circles on the line.",
+              "default": true
+            },
+            "showArea": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "Whether to fill the area under the line with a translucent gradient.",
+              "default": false
+            },
+            "height": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Chart height in pixels.",
+              "default": 300
+            }
+          },
+          "required": [
+            "component",
+            "data"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "PieChart": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a pie or donut chart from an array of segments. Each segment has a label and value. Colors are auto-assigned if not provided.",
+          "properties": {
+            "component": {
+              "const": "PieChart"
+            },
+            "title": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Optional chart title displayed above the chart."
+            },
+            "data": {
+              "description": "Array of segments. Each item has a 'label' (string) and 'value' (number), and optionally a 'color' (CSS color string).",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      },
+                      "color": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ]
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "donut": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "If true, renders as a donut chart with a hollow center.",
+              "default": false
+            },
+            "size": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Chart diameter in pixels.",
+              "default": 250
+            }
+          },
+          "required": [
+            "component",
+            "data"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Sparkline": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a compact inline sparkline chart from an array of numbers. Use inside StatCard or alongside text to show a quick trend.",
+          "properties": {
+            "component": {
+              "const": "Sparkline"
+            },
+            "values": {
+              "description": "Array of numeric values representing the trend data.",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Line color (CSS).",
+              "default": "#2563eb"
+            },
+            "width": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Sparkline width in pixels.",
+              "default": 120
+            },
+            "height": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Sparkline height in pixels.",
+              "default": 32
+            }
+          },
+          "required": [
+            "component",
+            "values"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "StatCard": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "#/$defs/CatalogComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a KPI / summary statistic card with a large value, label, and optional trend indicator. Use multiple StatCards in a Row to create a dashboard header.",
+          "properties": {
+            "component": {
+              "const": "StatCard"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The metric label (e.g. 'Total Revenue', 'Active Users')."
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The formatted display value (e.g. '$12,340', '1.2k', '98%'). Use formatNumber or formatCurrency to produce this."
+            },
+            "trend": {
+              "type": "string",
+              "description": "Direction of the trend arrow.",
+              "enum": [
+                "up",
+                "down",
+                "neutral"
+              ]
+            },
+            "trendValue": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The trend change text shown next to the arrow (e.g. '+12%', '-3.2%')."
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Accent color for the card's left border and icon."
+            },
+            "children": {
+              "$ref": "../common/common_types.json#/$defs/ChildList",
+              "description": "Optional children rendered below the stat value (e.g. a Sparkline)."
+            }
+          },
+          "required": [
+            "component",
+            "label",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
     }
   },
   "functions": {

@@ -5,6 +5,7 @@ export type FreesailThemeMode = 'light' | 'dark';
 export interface FreesailThemeTokens {
   bgRoot: string;
   bgSurface: string;
+  bgCard: string;
   bgMuted: string;
   textMain: string;
   textMuted: string;
@@ -27,6 +28,7 @@ export interface FreesailTheme {
 export const defaultLightTheme: FreesailThemeTokens = {
   bgRoot: '#f8fafc',
   bgSurface: '#ffffff',
+  bgCard: '#ffffff',
   bgMuted: '#f1f5f9',
   textMain: '#0f172a',
   textMuted: '#64748b',
@@ -44,6 +46,7 @@ export const defaultLightTheme: FreesailThemeTokens = {
 export const defaultDarkTheme: FreesailThemeTokens = {
   bgRoot: '#020617',
   bgSurface: '#0f172a',
+  bgCard: '#1e293b',
   bgMuted: '#1e293b',
   textMain: '#f8fafc',
   textMuted: '#94a3b8',
@@ -90,6 +93,7 @@ export function FreesailThemeProvider({ theme = 'light', children }: ThemeProvid
     :root {
       --freesail-bg-root: ${currentTheme.tokens.bgRoot};
       --freesail-bg-surface: ${currentTheme.tokens.bgSurface};
+      --freesail-bg-card: ${currentTheme.tokens.bgCard};
       --freesail-bg-muted: ${currentTheme.tokens.bgMuted};
       --freesail-text-main: ${currentTheme.tokens.textMain};
       --freesail-text-muted: ${currentTheme.tokens.textMuted};

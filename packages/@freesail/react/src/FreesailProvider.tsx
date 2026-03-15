@@ -10,6 +10,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react';
 import {
@@ -80,6 +81,8 @@ export function FreesailProvider({
   const [surfaceManager] = useState<SurfaceManager>(() => createSurfaceManager());
   const [transport, setTransport] = useState<A2UITransport | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  // Track surfaces deleted by agent messages so we don't echo them back
+  const agentDeletedRef = useRef<Set<string>>(new Set());
 
   // Register custom catalog definitions
   useEffect(() => {
@@ -116,13 +119,39 @@ export function FreesailProvider({
 
     // Handle incoming messages
     newTransport.on('message', (message: DownstreamMessage) => {
-      handleMessage(message, surfaceManager);
+      handleMessage(message, surfaceManager, agentDeletedRef.current);
+    });
+
+    // Notify agent when a surface is deleted client-side (e.g. disconnect cleanup)
+    const unsubSurfaceDeleted = surfaceManager.on('surfaceDeleted', (surfaceId: SurfaceId) => {
+      if (agentDeletedRef.current.delete(surfaceId as string)) {
+        // Agent-initiated delete — don't echo back
+        return;
+      }
+      // Client-initiated delete — notify the agent
+      newTransport.sendAction(
+        surfaceId,
+        'surface_deleted',
+        'system' as ComponentId,
+        { surfaceId, reason: 'client' }
+      );
+    });
+
+    // When a surface has no components after the orphan timeout,
+    // send a reminder action so the agent can decide to delete it.
+    const unsubOrphan = surfaceManager.on('surfaceOrphan', (surfaceId: SurfaceId) => {
+      newTransport.sendAction(
+        surfaceId,
+        'surface_cleanup_reminder',
+        'system' as ComponentId,
+        { surfaceId, message: 'This surface has no components. Delete it with if it is no longer needed.' }
+      );
     });
 
 
 
     // Handle connection state changes
-    newTransport.on('stateChange', (state) => {
+    newTransport.on('stateChange', (state: string) => {
       const connected = state === 'connected';
       setIsConnected(connected);
       
@@ -135,14 +164,14 @@ export function FreesailProvider({
     });
 
     // When session starts, register catalog schemas with the gateway
-    newTransport.on('sessionStart', (_sessionId) => {
+    newTransport.on('sessionStart', (_sessionId: string) => {
       if (catalogDefinitions.length > 0) {
         const schemas = catalogDefinitions
           .map((def) => def.schema)
           .filter((s) => s && Object.keys(s).length > 0);
 
         if (schemas.length > 0) {
-          newTransport.registerCatalogs(schemas).then((ok) => {
+          newTransport.registerCatalogs(schemas).then((ok: boolean) => {
             if (ok) {
               console.log('[Freesail] Catalogs registered with gateway');
             }
@@ -152,7 +181,7 @@ export function FreesailProvider({
     });
 
     // Handle errors
-    newTransport.on('error', (error) => {
+    newTransport.on('error', (error: Error) => {
       console.error('[Freesail] Transport error:', error);
       onError?.(error);
     });
@@ -166,6 +195,8 @@ export function FreesailProvider({
 
     // Cleanup
     return () => {
+      unsubSurfaceDeleted();
+      unsubOrphan();
       newTransport.disconnect();
       surfaceManager.dispose();
     };
@@ -226,7 +257,7 @@ export function FreesailProvider({
 // Message Handler
 // =============================================================================
 
-function handleMessage(message: DownstreamMessage, manager: SurfaceManager): void {
+function handleMessage(message: DownstreamMessage, manager: SurfaceManager, agentDeleted: Set<string>): void {
   if (isCreateSurfaceMessage(message)) {
     const { surfaceId, catalogId, sendDataModel } = message.createSurface;
     manager.createSurface({ surfaceId, catalogId, sendDataModel });
@@ -238,6 +269,7 @@ function handleMessage(message: DownstreamMessage, manager: SurfaceManager): voi
     manager.updateDataModel(surfaceId, path, value);
   } else if (isDeleteSurfaceMessage(message)) {
     const { surfaceId } = message.deleteSurface;
+    agentDeleted.add(surfaceId as string);
     manager.deleteSurface(surfaceId);
   }
 }
