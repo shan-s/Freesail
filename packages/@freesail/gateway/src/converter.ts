@@ -87,6 +87,20 @@ import { z } from 'zod';
 import Ajv, { type ValidateFunction } from 'ajv';
 
 /**
+ * Extracts the description from a component, searching through allOf entries if not at top level.
+ */
+function extractDescription(component: CatalogComponent): string | undefined {
+  if (component.description) return component.description;
+  if (component.allOf) {
+    for (const sub of component.allOf) {
+      const s = sub as CatalogComponent;
+      if (s.description) return s.description;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Schema for a component property in the catalog.
  */
 export interface CatalogProperty {
@@ -152,7 +166,7 @@ export function catalogToMCPTools(catalog: Catalog): MCPTool[] {
   const catalogDefs = (catalog.$defs ?? {}) as Record<string, unknown>;
   return Object.entries(catalog.components).map(([name, component]) => ({
     name: `render_${name.toLowerCase()}`,
-    description: component.description ?? `Render a ${name} component`,
+    description: extractDescription(component) ?? `Render a ${name} component`,
     inputSchema: componentToSchema(name, component, catalogDefs),
   }));
 }
@@ -372,8 +386,9 @@ export function generateCatalogPrompt(catalog: Catalog): string {
 
   for (const [componentName, component] of Object.entries(catalog.components)) {
     lines.push(`**${componentName}**`);
-    if (component.description) {
-      lines.push(`  ${component.description}`);
+    const componentDesc = extractDescription(component);
+    if (componentDesc) {
+      lines.push(`  ${componentDesc}`);
     }
     // Helper to collect all properties including from allOf + $ref resolution
     const allProps: Record<string, CatalogProperty> = {};
@@ -534,8 +549,36 @@ export function generateCatalogPrompt(catalog: Catalog): string {
   const funcEntries = catalog.functions ? Object.entries(catalog.functions) : [];
   if (funcEntries.length > 0) {
     lines.push('### Available Functions:', '');
+    lines.push('Function args are **positional**. When using named-key objects, use the parameter names below as keys in the correct order.');
+    lines.push('');
     for (const [name, func] of funcEntries) {
-      lines.push(`**${name}**`);
+      // Build parameter signature from schema items
+      const params = func.parameters as Record<string, unknown> | undefined;
+      const items = params?.['items'];
+      let sig = '';
+      if (Array.isArray(items) && items.length > 0) {
+        const paramParts = items.map((item: Record<string, unknown>, i: number) => {
+          const paramName = item['name'] as string | undefined;
+          const desc = item['description'] as string | undefined;
+          const ref = item['$ref'] as string | undefined;
+          let typeName = 'any';
+          if (ref) {
+            const base = ref.split('/').pop() || '';
+            typeName = base.startsWith('Dynamic') ? base.replace('Dynamic', '').toLowerCase() : base;
+          } else if (item['type']) {
+            typeName = item['type'] as string;
+          }
+          const minItems = params?.['minItems'] as number | undefined;
+          const optional = minItems !== undefined && i >= minItems;
+          const label = paramName ? `${paramName}: ${typeName}` : typeName;
+          return `${label}${optional ? '?' : ''}${desc ? ` /* ${desc} */` : ''}`;
+        });
+        sig = `(${paramParts.join(', ')})`;
+      } else {
+        sig = '()';
+      }
+      const ret = func.returnType ? ` → ${func.returnType}` : '';
+      lines.push(`**${name}**${sig}${ret}`);
       if (func.description) {
         lines.push(`  ${func.description}`);
       }

@@ -57,20 +57,55 @@ export type ComponentMap = Map<string, FreesailComponent>;
 class ComponentRegistry {
   private catalogs: Map<CatalogId, ComponentMap> = new Map();
   private functions: Map<CatalogId, Record<string, FunctionImplementation>> = new Map();
+  /** Positional parameter names per function, extracted from the catalog schema. */
+  private paramNames: Map<CatalogId, Record<string, string[]>> = new Map();
   private fallbackComponent: FreesailComponent | null = null;
 
   /**
-   * Register a catalog with its components and functions.
+   * Register a catalog with its components, functions, and optional schema.
+   * When a schema is provided, parameter names are extracted from
+   * `functions.*.parameters.items[].name` so `evaluateFunction` can
+   * reorder named-key argument objects from the LLM.
    */
   registerCatalog(
     catalogId: CatalogId,
     components: Record<string, FreesailComponent>,
-    functions?: Record<string, FunctionImplementation>
+    functions?: Record<string, FunctionImplementation>,
+    schema?: Record<string, unknown>
   ): void {
     const map: ComponentMap = new Map(Object.entries(components));
     this.catalogs.set(catalogId, map);
     if (functions) {
       this.functions.set(catalogId, functions);
+    }
+    if (schema) {
+      this.extractParamNames(catalogId, schema);
+    }
+  }
+
+  /**
+   * Extract positional parameter names from a catalog schema's function definitions.
+   */
+  private extractParamNames(catalogId: CatalogId, schema: Record<string, unknown>): void {
+    const funcs = schema['functions'] as Record<string, Record<string, unknown>> | undefined;
+    if (!funcs) return;
+    const names: Record<string, string[]> = {};
+    for (const [funcName, funcDef] of Object.entries(funcs)) {
+      const params = funcDef['parameters'] as Record<string, unknown> | undefined;
+      if (!params) continue;
+      const items = params['items'];
+      if (!Array.isArray(items) || items.length === 0) continue;
+      const paramNameList: string[] = [];
+      for (const item of items) {
+        const name = (item as Record<string, unknown>)['name'] as string | undefined;
+        if (name) paramNameList.push(name);
+      }
+      if (paramNameList.length > 0) {
+        names[funcName] = paramNameList;
+      }
+    }
+    if (Object.keys(names).length > 0) {
+      this.paramNames.set(catalogId, names);
     }
   }
 
@@ -128,6 +163,14 @@ class ComponentRegistry {
   }
 
   /**
+   * Get the declared positional parameter names for a function.
+   * Returns undefined if no schema was registered or the function has no named params.
+   */
+  getParamNames(catalogId: CatalogId, functionName: string): string[] | undefined {
+    return this.paramNames.get(catalogId)?.[functionName];
+  }
+
+  /**
    * Check if a catalog is registered.
    */
   hasCatalog(catalogId: CatalogId): boolean {
@@ -154,6 +197,7 @@ class ComponentRegistry {
   clear(): void {
     this.catalogs.clear();
     this.functions.clear();
+    this.paramNames.clear();
     this.fallbackComponent = null;
   }
 }
@@ -182,7 +226,8 @@ export function withCatalog<P extends FreesailComponentProps>(
 export function registerCatalog(
   catalogId: CatalogId,
   components: Record<string, FreesailComponent>,
-  functions?: Record<string, FunctionImplementation>
+  functions?: Record<string, FunctionImplementation>,
+  schema?: Record<string, unknown>
 ): void {
-  registry.registerCatalog(catalogId, components, functions);
+  registry.registerCatalog(catalogId, components, functions, schema);
 }

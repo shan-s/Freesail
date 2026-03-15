@@ -15,7 +15,8 @@
   "functions": [
     "required",
     "regex",
-    "length",
+    "checkLength",
+    "getLength",
     "numeric",
     "email",
     "formatNumber",

@@ -13,6 +13,7 @@ import {
 } from '@freesail/core';
 import type {
   SurfaceId,
+  CatalogId,
   A2UIComponent,
   ComponentId,
   ChildList,
@@ -412,20 +413,47 @@ function evaluateFunction(
   if (Array.isArray(call.args)) {
     rawArgs = call.args;
   } else if (call.args && typeof call.args === 'object') {
-    // If it's an object, we need to extract the values in the correct order.
-    // Agents often generate object keys like "'0'", "'1'" out of numerical order,
-    // so we parse the keys as numbers and sort them.
     const entries = Object.entries(call.args);
-    entries.sort(([keyA], [keyB]) => {
-      // Remove surrounding quotes if present to cleanly parse as number
-      const numA = parseInt(keyA.replace(/^'|'$/g, ''), 10);
-      const numB = parseInt(keyB.replace(/^'|'$/g, ''), 10);
-      if (!isNaN(numA) && !isNaN(numB)) {
-        return numA - numB;
+
+    // Check if the registry declares paramNames for this function
+    // and the keys are named (not numeric).
+    // If so, reorder entries to match the declared parameter order.
+    const paramNames = registry.getParamNames(catalogId as CatalogId, functionName);
+    const hasNonNumericKeys = entries.some(([key]) => isNaN(parseInt(key.replace(/^'|'$/g, ''), 10)));
+
+    if (paramNames && hasNonNumericKeys) {
+      // Build a lookup from the entries
+      const argMap = new Map(entries);
+      // Reorder: first pull args matching declared param names in order,
+      // then append any extra keys not in paramNames
+      const ordered: unknown[] = [];
+      const used = new Set<string>();
+      for (const name of paramNames) {
+        if (argMap.has(name)) {
+          ordered.push(argMap.get(name));
+          used.add(name);
+        }
       }
-      return 0; // fallback to stable sort for non-numeric keys
-    });
-    rawArgs = entries.map(([, value]) => value);
+      // Append remaining keys not in paramNames (preserves insertion order)
+      for (const [key, value] of entries) {
+        if (!used.has(key)) {
+          ordered.push(value);
+        }
+      }
+      rawArgs = ordered;
+    } else {
+      // Numeric keys or no paramNames — sort numerically as before
+      entries.sort(([keyA], [keyB]) => {
+        // Remove surrounding quotes if present to cleanly parse as number
+        const numA = parseInt(keyA.replace(/^'|'$/g, ''), 10);
+        const numB = parseInt(keyB.replace(/^'|'$/g, ''), 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+        return 0; // fallback to stable sort for non-numeric keys
+      });
+      rawArgs = entries.map(([, value]) => value);
+    }
 
     // Robustness: agents sometimes wrap multiple positional args in a single-key
     // object as an array, e.g. { "value": [arg0, arg1] } instead of [arg0, arg1].

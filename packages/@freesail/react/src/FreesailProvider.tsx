@@ -90,7 +90,8 @@ export function FreesailProvider({
       registerCatalog(
         def.namespace as CatalogId,
         def.components as Record<string, FreesailComponent>,
-        def.functions
+        def.functions,
+        def.schema as Record<string, unknown> | undefined
       );
     }
   }, [catalogDefinitions]);

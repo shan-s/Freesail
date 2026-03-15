@@ -290,10 +290,19 @@ export function prepareCatalog(config: CatalogConfig): boolean {
     } catch { /* @freesail/catalogs not installed */ }
   }
 
-  // 5. Merge everything
-  const mergedComponents = { ...rewrittenComponents, ...customComponents };
-  const mergedFunctions = { ...rewrittenFunctions, ...customFunctions };
-  const mergedDefs = { ...rewrittenDefs, ...customDefs };
+  // 5. Merge everything (catalog's own entries first, then common; custom overrides on collision)
+  const mergedComponents: Record<string, unknown> = { ...customComponents };
+  for (const [k, v] of Object.entries(rewrittenComponents)) {
+    if (!(k in mergedComponents)) mergedComponents[k] = v;
+  }
+  const mergedFunctions: Record<string, unknown> = { ...customFunctions };
+  for (const [k, v] of Object.entries(rewrittenFunctions)) {
+    if (!(k in mergedFunctions)) mergedFunctions[k] = v;
+  }
+  const mergedDefs: Record<string, unknown> = { ...customDefs };
+  for (const [k, v] of Object.entries(rewrittenDefs)) {
+    if (!(k in mergedDefs)) mergedDefs[k] = v;
+  }
 
   // 6. Apply exclusions from catalog.exclude.json (if present)
   const excludeJson = readJsonSafe(path.join(config.srcPath, 'catalog.exclude.json'));

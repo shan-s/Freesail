@@ -1055,7 +1055,7 @@ export function StatCard({ component, children }: FreesailComponentProps) {
         <svg width="14" height="14" viewBox="0 0 24 24" fill={trendColor} style={{ flexShrink: 0 }}>
           {trend === 'up' && <path d="M5 17.59L12 4l7 13.59H5z" />}
           {trend === 'down' && <path d="M5 6.41L12 20l7-13.59H5z" />}
-          {trend !== 'up' && trend !== 'down' && <path d="M4 11h13.17l-4.59-4.59L14 5l7 7-7 7-1.41-1.41L17.17 13H4v-2z" />}
+          {trend !== 'up' && trend !== 'down' && <path d="M6 4l14 8-14 8V4z" />}
         </svg>
         {trendValue && <span>{trendValue}</span>}
         {/* Reserve space when no trend data */}
