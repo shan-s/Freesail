@@ -8,6 +8,7 @@
 import React, { useState, useRef, useEffect, type CSSProperties } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { FreesailComponentProps } from '@freesail/react';
+import { getSemanticColor, getSemanticBackground, getContrastTextColor } from '../common/common-utils.js';
 
 // =============================================================================
 // ChatContainer
@@ -23,6 +24,9 @@ import type { FreesailComponentProps } from '@freesail/react';
 export function ChatContainer({ component, children }: FreesailComponentProps) {
   const height = (component['height'] as string) ?? '100%';
   const title = component['title'] as string | undefined;
+  const rawBg = component['background'] as string | undefined;
+  const background = getSemanticBackground(rawBg);
+  const color = getSemanticColor(component['color'] as string | undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const childArray = React.Children.toArray(children);
@@ -43,7 +47,8 @@ export function ChatContainer({ component, children }: FreesailComponentProps) {
     minHeight: 0,
     overflow: 'hidden',
     fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: 'var(--freesail-bg-root, #ffffff)',
+    backgroundColor: background ?? 'var(--freesail-bg-root, #ffffff)',
+    color: color ?? (rawBg ? getContrastTextColor(rawBg) : undefined),
     borderRight: '1px solid var(--freesail-border, #e2e8f0)',
   };
 
@@ -117,9 +122,23 @@ export function ChatMessage({ component, scopeData }: FreesailComponentProps) {
   const role = (component['role'] as string) ?? (scopeData as any)?.role ?? 'user';
   const content = (component['content'] as string) ?? (scopeData as any)?.content ?? '';
   const timestamp = (component['timestamp'] as string) ?? (scopeData as any)?.timestamp;
+  const rawBg = component['background'] as string | undefined;
+  const rawColor = component['color'] as string | undefined;
+  const background = getSemanticBackground(rawBg);
+  const color = getSemanticColor(rawColor);
 
   const isUser = role === 'user';
   const isSystem = role === 'system';
+
+  const defaultBg = isSystem ? 'var(--freesail-warning, #f59e0b)' : isUser ? 'var(--freesail-primary, #2563eb)' : 'var(--freesail-bg-muted, #f8fafc)';
+  const defaultColor = isUser ? '#ffffff' : 'var(--freesail-text-main, #0f172a)';
+
+  // When agent provides a background but no explicit color, auto-derive contrast text
+  const resolvedColor = rawColor
+    ? (color ?? rawColor)
+    : rawBg
+      ? getContrastTextColor(rawBg, defaultColor)
+      : defaultColor;
 
   const containerStyle: CSSProperties = {
     display: 'flex',
@@ -131,8 +150,8 @@ export function ChatMessage({ component, scopeData }: FreesailComponentProps) {
     maxWidth: '85%',
     padding: '10px 14px',
     borderRadius: isUser ? 'var(--freesail-radius-lg) var(--freesail-radius-lg) 4px var(--freesail-radius-lg)' : 'var(--freesail-radius-lg) var(--freesail-radius-lg) var(--freesail-radius-lg) 4px',
-    backgroundColor: isSystem ? 'var(--freesail-warning, #f59e0b)' : isUser ? 'var(--freesail-primary, #2563eb)' : 'var(--freesail-bg-muted, #f8fafc)',
-    color: isUser ? 'var(--freesail-primary-text, #ffffff)' : 'var(--freesail-text-main, #0f172a)',
+    backgroundColor: background ?? defaultBg,
+    color: resolvedColor,
     fontSize: '14px',
     lineHeight: '1.5',
     whiteSpace: isUser ? 'pre-wrap' : undefined,
@@ -206,12 +225,17 @@ export function ChatInput({ component, onAction }: FreesailComponentProps) {
     }
   };
 
+  const rawBg = component['background'] as string | undefined;
+  const rawButtonColor = component['buttonColor'] as string | undefined;
+  const background = getSemanticBackground(rawBg);
+  const buttonColor = getSemanticBackground(rawButtonColor);
+
   const containerStyle: CSSProperties = {
     padding: '16px',
     borderTop: '1px solid var(--freesail-border, #e2e8f0)',
     display: 'flex',
     gap: '8px',
-    backgroundColor: 'var(--freesail-bg-root, #ffffff)'
+    backgroundColor: background ?? 'var(--freesail-bg-root, #ffffff)'
   };
 
   const inputStyle: CSSProperties = {
@@ -223,15 +247,15 @@ export function ChatInput({ component, onAction }: FreesailComponentProps) {
     outline: 'none',
     opacity: disabled ? 0.6 : 1,
     backgroundColor: 'var(--freesail-bg-surface, #ffffff)',
-    color: 'var(--freesail-text-main, #0f172a)',
+    color: rawBg ? getContrastTextColor(rawBg, 'var(--freesail-text-main, #0f172a)') : 'var(--freesail-text-main, #0f172a)',
   };
 
   const buttonStyle: CSSProperties = {
     padding: '10px 20px',
     border: 'none',
     borderRadius: '20px',
-    backgroundColor: 'var(--freesail-primary, #2563eb)',
-    color: 'var(--freesail-primary-text, #ffffff)',
+    backgroundColor: buttonColor ?? 'var(--freesail-primary, #2563eb)',
+    color: rawButtonColor ? getContrastTextColor(rawButtonColor, '#ffffff') : 'var(--freesail-primary-text, #ffffff)',
     fontSize: '14px',
     cursor: disabled || !text.trim() ? 'not-allowed' : 'pointer',
     opacity: disabled || !text.trim() ? 0.5 : 1,
@@ -341,6 +365,10 @@ function Dot({ delay }: { delay: number }) {
 export function AgentStream({ component }: FreesailComponentProps) {
   const active = (component['active'] as boolean) ?? false;
   const token = (component['token'] as string) ?? '';
+  const rawBg = component['background'] as string | undefined;
+  const rawColor = component['color'] as string | undefined;
+  const background = getSemanticBackground(rawBg);
+  const color = getSemanticColor(rawColor);
 
   const bufferRef = useRef('');
   const prevTokenRef = useRef('');
@@ -375,8 +403,12 @@ export function AgentStream({ component }: FreesailComponentProps) {
     maxWidth: '85%',
     padding: '10px 14px',
     borderRadius: 'var(--freesail-radius-lg) var(--freesail-radius-lg) var(--freesail-radius-lg) 4px',
-    backgroundColor: 'var(--freesail-bg-muted, #f8fafc)',
-    color: 'var(--freesail-text-main, #0f172a)',
+    backgroundColor: background ?? 'var(--freesail-bg-muted, #f8fafc)',
+    color: rawColor
+      ? (color ?? rawColor)
+      : rawBg
+        ? getContrastTextColor(rawBg, 'var(--freesail-text-main, #0f172a)')
+        : 'var(--freesail-text-main, #0f172a)',
     fontSize: '14px',
     lineHeight: '1.5',
     wordBreak: 'break-word',

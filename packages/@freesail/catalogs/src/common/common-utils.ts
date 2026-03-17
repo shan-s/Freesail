@@ -43,6 +43,41 @@ export function getSemanticBackground(bg: string | undefined): string | undefine
   return semanticMap[bg] || bg;
 }
 
+/**
+ * Given a raw background value (semantic token, hex color, gradient, etc.),
+ * returns a suitable text color for contrast.
+ *
+ * - Semantic bg tokens (bgRoot, bgSurface, bgMuted) → theme-adaptive CSS variable
+ * - Hex colors → luminance-based hardcoded dark (#0f172a) or light (#ffffff)
+ * - Everything else (gradients, CSS vars, etc.) → `fallback` (default: white)
+ */
+export function getContrastTextColor(
+  rawBackground: string | undefined,
+  fallback: string = '#ffffff',
+): string {
+  if (!rawBackground) return fallback;
+
+  const semanticBgTokens = ['bgRoot', 'bgSurface', 'bgMuted'];
+  if (semanticBgTokens.includes(rawBackground)) {
+    return 'var(--freesail-text-main, #0f172a)';
+  }
+
+  const bg = rawBackground.trim();
+  if (bg.startsWith('#')) {
+    let hex = bg.replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    if (hex.length === 6) {
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return luminance > 0.6 ? '#0f172a' : '#ffffff';
+    }
+  }
+
+  return fallback;
+}
+
 export function mapJustify(justify: string | undefined): CSSProperties['justifyContent'] {
   switch (justify) {
     case 'start': return 'flex-start';

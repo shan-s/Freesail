@@ -366,6 +366,58 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
 
 
   server.registerTool(
+    'get_data_model',
+    {
+      description:
+        'Retrieve the current data model for a surface from the client. ' +
+        'Sends a request to the frontend which responds with the full data model ' +
+        'regardless of the sendDataModel setting.',
+      inputSchema: {
+        surfaceId: z.string().describe('The surface to get the data model for'),
+        sessionId: z.string().describe('Target client session ID'),
+      },
+    },
+    async ({ surfaceId, sessionId }) => {
+      const session = sessionManager.getSession(sessionId);
+      if (!session) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: false, error: `Session ${sessionId} not found` }) }],
+          isError: true,
+        };
+      }
+
+      const surfaceError = sessionManager.validateSurfaceForSession(sessionId, surfaceId);
+      if (surfaceError) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ success: false, error: surfaceError }) }],
+          isError: true,
+        };
+      }
+
+      try {
+        const dataModel = await sessionManager.requestDataModel(sessionId, surfaceId as SurfaceId);
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true, surfaceId, dataModel }),
+          }],
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'delete_surface',
     {
       description: 'Remove a surface and all its components from the UI for a specific client.',

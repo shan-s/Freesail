@@ -1,0 +1,33 @@
+{
+  "components": [
+    "Icon",
+    "Text",
+    "Modal",
+    "Button",
+    "TextField",
+    "ChoicePicker",
+    "DateTimeInput"
+  ],
+  "functions": [
+    "required",
+    "regex",
+    "checkLength",
+    "getLength",
+    "numeric",
+    "email",
+    "formatNumber",
+    "formatCurrency",
+    "pluralize",
+    "openUrl",
+    "not",
+    "and",
+    "or",
+    "isEmpty",
+    "eq",
+    "neq",
+    "gt",
+    "gte",
+    "lt",
+    "lte"
+  ]
+}

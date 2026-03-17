@@ -21,8 +21,8 @@
 
 import fs from 'fs';
 import path from 'path';
-
-// When running as an npm lifecycle script (e.g. prebuild), npm sets
+import Ajv from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
 // process.cwd() to the package root — INIT_CWD would incorrectly point
 // to the workspace root during workspace builds.
 // For direct CLI invocations (npx freesail …), INIT_CWD preserves the
@@ -196,6 +196,34 @@ function validateCatalog(config: CatalogConfig): boolean {
   } catch {
     console.error(`   ❌ Cannot parse JSON: ${config.jsonFile}`);
     return false;
+  }
+
+  // 1.5 Strict JSON Schema validation against catalog-schema.json
+  try {
+    const schemaPath = path.join(__dirname, 'catalog', 'catalog-schema.json');
+    if (fs.existsSync(schemaPath)) {
+      const metaSchema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
+      // Remove $schema to prevent Ajv from trying to fetch or look up external URI
+      delete metaSchema.$schema;
+      const ajv = new Ajv({ allErrors: true, strict: false });
+      addFormats(ajv);
+      const validate = ajv.compile(metaSchema);
+      const valid = validate(schema);
+      if (!valid) {
+        console.error(`   ❌ Catalog JSON fails schema validation (${config.jsonFile}):`);
+         for (const err of validate.errors || []) {
+            const field = err.instancePath ? err.instancePath.replace(/^\//, '') : 'root';
+            console.error(`      - ${field}: ${err.message}`);
+         }
+        isOk = false;
+      } else {
+        console.log(`   ✅ Passed strict schema validation.`);
+      }
+    } else {
+      console.warn(`   ⚠  Could not find catalog-schema.json for strict validation at ${schemaPath}`);
+    }
+  } catch (err) {
+    console.error(`   ⚠  Error during strict schema validation setup:`, err);
   }
 
   const catalogId = schema['catalogId'] ?? schema['$id'] ?? schema['id'];

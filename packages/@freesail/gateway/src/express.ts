@@ -161,6 +161,19 @@ export function createExpressServer(options: ExpressServerOptions): Express {
 
       logger.info(`[Express] Received upstream message: ${JSON.stringify(message)}`);
 
+      // Intercept __get_data_model_response — resolve the pending request
+      // instead of enqueuing it as a normal action.
+      if ('action' in message && message.action.name === '__get_data_model_response') {
+        const surfaceId = message.action.surfaceId;
+        const dataModel = (message.action.context?.['current_data_model'] ?? {}) as Record<string, unknown>;
+        const resolvedSid = sessionId ?? sessionManager.getSessionBySurface(surfaceId)?.id;
+        if (resolvedSid) {
+          sessionManager.resolveDataModelRequest(resolvedSid, surfaceId, dataModel);
+        }
+        res.json({ success: true, sessionId: resolvedSid });
+        return;
+      }
+
       // Resolve session: from header, or from surface→session mapping
       let resolvedSessionId = sessionId ?? null;
       if (!resolvedSessionId) {

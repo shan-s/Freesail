@@ -113,7 +113,8 @@ export function Text({ component }: FreesailComponentProps) {
 }
 
 export function Icon({ component }: FreesailComponentProps) {
-  const name = String((component['name'] as string) ?? 'circle');
+  const rawName = component['name'];
+  const name = (typeof rawName === 'string') ? rawName : 'help';
   const size = (component['size'] as string) ?? '24px';
   const color = getSemanticColor(component['color'] as string) ?? 'currentColor';
 

@@ -255,6 +255,18 @@ export interface DeleteSurfaceMessage extends A2UIMessageBase {
   };
 }
 
+/**
+ * Requests the client to send back the current data model for a surface.
+ * The client responds with an action named '__get_data_model_response'
+ * containing the full data model in the action context.
+ */
+export interface GetDataModelMessage extends A2UIMessageBase {
+  getDataModel: {
+    /** The surface to get the data model for */
+    surfaceId: SurfaceId;
+  };
+}
+
 // =============================================================================
 // Client -> Server Messages (Upstream via HTTP POST)
 // =============================================================================
@@ -338,7 +350,8 @@ export type DownstreamMessage =
   | CreateSurfaceMessage
   | UpdateComponentsMessage
   | UpdateDataModelMessage
-  | DeleteSurfaceMessage;
+  | DeleteSurfaceMessage
+  | GetDataModelMessage;
 
 /**
  * All possible client-to-server (upstream) messages.
@@ -370,6 +383,10 @@ export function isDeleteSurfaceMessage(msg: A2UIMessage): msg is DeleteSurfaceMe
   return 'deleteSurface' in msg;
 }
 
+export function isGetDataModelMessage(msg: A2UIMessage): msg is GetDataModelMessage {
+  return 'getDataModel' in msg;
+}
+
 export function isActionMessage(msg: A2UIMessage): msg is ActionMessage {
   return 'action' in msg;
 }
@@ -383,7 +400,8 @@ export function isDownstreamMessage(msg: A2UIMessage): msg is DownstreamMessage 
     isCreateSurfaceMessage(msg) ||
     isUpdateComponentsMessage(msg) ||
     isUpdateDataModelMessage(msg) ||
-    isDeleteSurfaceMessage(msg)
+    isDeleteSurfaceMessage(msg) ||
+    isGetDataModelMessage(msg)
   );
 }
 

@@ -36,9 +36,10 @@ const AGENT_ID = 'freesail-example-agent';
 
 // ============================================================================
 // LLM Provider Selection
-// Supported: 'gemini' (default), 'openai'
-// Set LLM_PROVIDER=openai and OPENAI_API_KEY, or
-//     LLM_PROVIDER=gemini and GOOGLE_API_KEY.
+// Supported: 'gemini' (default), 'openai', 'claude'
+// Set LLM_PROVIDER=openai  and OPENAI_API_KEY, or
+//     LLM_PROVIDER=claude  and ANTHROPIC_API_KEY, or
+//     LLM_PROVIDER=gemini  and GOOGLE_API_KEY.
 // ============================================================================
 
 const LLM_PROVIDER = (process.env['LLM_PROVIDER'] ?? 'gemini').toLowerCase();
@@ -61,6 +62,21 @@ if (LLM_PROVIDER === 'openai') {
     streaming: true,
   });
   logger.info(`LLM provider: OpenAI (${openaiModel})`);
+} else if (LLM_PROVIDER === 'claude') {
+  const ANTHROPIC_API_KEY = process.env['ANTHROPIC_API_KEY'];
+  if (!ANTHROPIC_API_KEY) {
+    logger.fatal('ANTHROPIC_API_KEY environment variable is required when LLM_PROVIDER=claude.');
+    process.exit(1);
+  }
+  const { ChatAnthropic } = await import('@langchain/anthropic');
+  const claudeModel = process.env['CLAUDE_MODEL'] ?? 'claude-sonnet-4-5-20250929';
+  model = new ChatAnthropic({
+    anthropicApiKey: ANTHROPIC_API_KEY,
+    model: claudeModel,
+    temperature: LLM_TEMPERATURE,
+    streaming: true,
+  });
+  logger.info(`LLM provider: Anthropic Claude (${claudeModel})`);
 } else {
   // Default: Gemini
   const GOOGLE_API_KEY = process.env['GOOGLE_API_KEY'];

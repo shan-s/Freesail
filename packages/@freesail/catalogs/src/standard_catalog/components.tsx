@@ -670,7 +670,7 @@ export function BarChart({ component }: FreesailComponentProps) {
   const title = component['title'] as string | undefined;
   const data = parseData(component['data']);
   const orientation = (component['orientation'] as string) ?? 'vertical';
-  const defaultColor = (component['color'] as string) ?? '#2563eb';
+  const defaultColor = getSemanticColor(component['color'] as string) ?? '#2563eb';
   const showValues = component['showValues'] !== false;
   const height = Number(component['height'] ?? 300);
 
@@ -789,7 +789,7 @@ export function BarChart({ component }: FreesailComponentProps) {
 export function LineChart({ component }: FreesailComponentProps) {
   const title = component['title'] as string | undefined;
   const data = parseData(component['data']);
-  const color = (component['color'] as string) ?? '#2563eb';
+  const color = getSemanticColor(component['color'] as string) ?? '#2563eb';
   const showDots = component['showDots'] !== false;
   const showArea = component['showArea'] === true;
   const height = Number(component['height'] ?? 300);
@@ -972,7 +972,7 @@ export function PieChart({ component }: FreesailComponentProps) {
  */
 export function Sparkline({ component }: FreesailComponentProps) {
   const values = (component['values'] as number[]) ?? [];
-  const color = (component['color'] as string) ?? '#2563eb';
+  const color = getSemanticColor(component['color'] as string) ?? '#2563eb';
   const width = Number(component['width'] ?? 120);
   const height = Number(component['height'] ?? 32);
 
@@ -1012,10 +1012,10 @@ export function StatCard({ component, children }: FreesailComponentProps) {
   const value = (component['value'] as string) ?? '';
   const trend = component['trend'] as string | undefined;
   const trendValue = component['trendValue'] as string | undefined;
-  const accentColor = (component['color'] as string) ?? 'var(--freesail-primary, #2563eb)';
+  const accentColor = getSemanticColor(component['color'] as string) ?? 'var(--freesail-primary, #2563eb)';
 
   const defaultTrendColor = trend === 'up' ? '#10b981' : trend === 'down' ? '#ef4444' : 'var(--freesail-text-muted, #64748b)';
-  const trendColor = (component['trendColor'] as string) ?? defaultTrendColor;
+  const trendColor = getSemanticColor(component['trendColor'] as string) ?? defaultTrendColor;
   
   const cardStyle: CSSProperties = {
     flex: '1 1 auto',

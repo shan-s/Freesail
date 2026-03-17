@@ -271,20 +271,6 @@ export class SurfaceManager {
   }
 
   /**
-   * Get data models for ALL surfaces that have sendDataModel enabled.
-   * Returns a map of surfaceId → dataModel.
-   */
-  getAllSendableDataModels(): Record<string, Record<string, unknown>> {
-    const result: Record<string, Record<string, unknown>> = {};
-    for (const [id, surface] of this.surfaces) {
-      if (surface.sendDataModel) {
-        result[id as string] = surface.dataModel;
-      }
-    }
-    return result;
-  }
-
-  /**
    * Check if a surface has sendDataModel enabled.
    */
   shouldSendDataModel(surfaceId: SurfaceId): boolean {

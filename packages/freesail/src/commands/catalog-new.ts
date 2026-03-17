@@ -4,7 +4,7 @@
  * Scaffolds a new Freesail catalog package using the fork-and-own model.
  *
  * Common files (components, functions, types) are copied from
- * @freesail/catalogs/src/common/ into the new catalog's src/common/ folder.
+ * the bundled catalog/ directory into the new catalog's src/common/ folder.
  * The developer owns all files and can modify them freely.
  *
  * After scaffolding, `freesail prepare catalog` is run to generate the
@@ -53,22 +53,19 @@ function ask(rl: ReturnType<typeof createInterface>, question: string, defaultVa
 }
 
 /**
- * Locate the @freesail/catalogs package root by walking up from
- * require.resolve('@freesail/catalogs/package.json').
+ * Locate the bundled catalog directory shipped with the freesail CLI.
  */
-function findCatalogsPackageRoot(): string {
-  // require.resolve gives us the exact path to package.json
-  const pkgJsonPath = require.resolve('@freesail/catalogs/package.json');
-  return path.dirname(pkgJsonPath);
+function findCatalogDir(): string {
+  return path.join(__dirname, 'catalog');
 }
 
 /**
- * Read a common source file from @freesail/catalogs/src/common/.
+ * Read a common source file from the bundled catalog/ directory.
  */
-function readCommonFile(catalogsRoot: string, filename: string): string {
-  const filePath = path.join(catalogsRoot, 'src', 'common', filename);
+function readCommonFile(catalogDir: string, filename: string): string {
+  const filePath = path.join(catalogDir, filename);
   if (!fs.existsSync(filePath)) {
-    throw new Error(`Common file not found: ${filePath}\nMake sure @freesail/catalogs is installed.`);
+    throw new Error(`Common file not found: ${filePath}`);
   }
   return fs.readFileSync(filePath, 'utf-8');
 }
@@ -286,14 +283,12 @@ export async function run(): Promise<void> {
       process.exit(1);
     }
 
-    // Find @freesail/catalogs common source files
-    let catalogsRoot: string;
-    try {
-      catalogsRoot = findCatalogsPackageRoot();
-    } catch {
+    // Find bundled catalog common source files
+    const catalogDir = findCatalogDir();
+    if (!fs.existsSync(catalogDir)) {
       console.error(
-        '\n❌ Cannot find @freesail/catalogs package.\n' +
-        '   Install it first: npm install @freesail/catalogs'
+        '\n❌ Cannot find bundled catalog directory.\n' +
+        '   Reinstall the freesail package.'
       );
       process.exit(1);
     }
@@ -307,7 +302,7 @@ export async function run(): Promise<void> {
     fs.mkdirSync(schemasPath, { recursive: true });
 
     // Copy catalog schema file
-    const schemaSource = path.join(catalogsRoot, 'src', 'schemas', 'catalog-schema.json');
+    const schemaSource = path.join(catalogDir, 'catalog-schema.json');
     if (fs.existsSync(schemaSource)) {
       fs.writeFileSync(path.join(schemasPath, 'catalog-schema.json'), fs.readFileSync(schemaSource, 'utf-8'));
       console.log('   📄 src/schemas/catalog-schema.json');
@@ -316,7 +311,7 @@ export async function run(): Promise<void> {
     // Copy common source files into src/common/
     const filesToCopy = ['CommonComponents.tsx', 'CommonFunctions.ts', 'common_types.json', 'common_components.json', 'common_functions.json'];
     for (const file of filesToCopy) {
-      const content = readCommonFile(catalogsRoot, file);
+      const content = readCommonFile(catalogDir, file);
       fs.writeFileSync(path.join(commonPath, file), content);
       console.log(`   📄 src/common/${file}`);
     }

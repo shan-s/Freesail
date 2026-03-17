@@ -278,16 +278,13 @@ export function prepareCatalog(config: CatalogConfig): boolean {
       break;
     }
   }
-  // Fallback: resolve via node_modules (standalone catalogs)
+  // Fallback: resolve via the bundled catalog directory in the freesail CLI
   if (!schemaPath) {
-    try {
-      const pkgJson = require.resolve('@freesail/catalogs/package.json');
-      const candidate = path.join(path.dirname(pkgJson), 'src', 'schemas', 'catalog-schema.json');
-      if (fs.existsSync(candidate)) {
-        const rel = path.relative(config.srcPath, candidate).replace(/\\/g, '/');
-        schemaPath = rel.startsWith('.') ? rel : `./${rel}`;
-      }
-    } catch { /* @freesail/catalogs not installed */ }
+    const candidate = path.join(__dirname, 'catalog', 'catalog-schema.json');
+    if (fs.existsSync(candidate)) {
+      const rel = path.relative(config.srcPath, candidate).replace(/\\/g, '/');
+      schemaPath = rel.startsWith('.') ? rel : `./${rel}`;
+    }
   }
 
   // 5. Merge everything (catalog's own entries first, then common; custom overrides on collision)

@@ -11,6 +11,7 @@
 import React, { type CSSProperties } from 'react';
 import type { FreesailComponentProps } from '@freesail/react';
 import { commonComponents } from './common/CommonComponents.js';
+import { getSemanticBackground, getSemanticColor, getContrastTextColor } from './common/common-utils.js';
 
 // =============================================================================
 // Condition Icons & Colors
@@ -73,28 +74,18 @@ export function WeatherCard({ component }: FreesailComponentProps) {
   const rawFeelsLike = component['feelsLike'];
   const feelsLike = rawFeelsLike !== undefined ? parseFloat(String(rawFeelsLike)) : undefined;
 
-  const background = (component['background'] as string) ?? getConditionGradient(condition);
+  const rawBackground = (component['background'] as string) ?? undefined;
+  const background = getSemanticBackground(rawBackground) ?? getConditionGradient(condition);
 
+  // Determine text color for contrast:
+  // - If agent provided a background, use getContrastTextColor (handles semantic tokens, hex, etc.)
+  // - Otherwise fall back to condition-based defaults (snowy/foggy = dark text, rest = white)
   const normalizedCondition = condition.toLowerCase().replace(/\\s+/g, '-');
-  
-  let isLight = normalizedCondition === 'snowy' || normalizedCondition === 'foggy';
-  
-  if (component['background']) {
-    const bg = String(component['background']).trim();
-    if (bg.startsWith('#')) {
-      let hex = bg.replace('#', '');
-      if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-      if (hex.length === 6) {
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        isLight = luminance > 0.6;
-      }
-    }
-  }
-
-  const textColor = isLight ? 'var(--freesail-text-main, #0f172a)' : 'var(--freesail-primary-text, #ffffff)';
+  const conditionDefault = (normalizedCondition === 'snowy' || normalizedCondition === 'foggy')
+    ? '#0f172a' : '#ffffff';
+  const textColor = rawBackground
+    ? getContrastTextColor(rawBackground, conditionDefault)
+    : conditionDefault;
 
   const containerStyle: CSSProperties = {
     background,
@@ -269,7 +260,7 @@ export function TemperatureDisplay({ component }: FreesailComponentProps) {
   const value = Number(component['value'] ?? 0);
   const unit = (component['unit'] as string) ?? 'C';
   const size = String((component['size'] as string) ?? 'lg').toLowerCase();
-  const color = (component['color'] as string) ?? 'var(--freesail-text-main, #0f172a)';
+  const color = getSemanticColor(component['color'] as string) ?? 'var(--freesail-text-main, #0f172a)';
 
   const sizeMap: Record<string, string> = {
     sm: '24px',

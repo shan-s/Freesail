@@ -23,6 +23,11 @@ const BUNDLED_DEFS: Record<string, Record<string, unknown>> = {
         type: 'object',
         description: 'Accessibility attributes (label, description) for assistive technologies.',
       },
+      visible: {
+        type: 'boolean',
+        description: 'Controls whether the component is rendered. Defaults to true.',
+        default: true,
+      },
     },
   },
   Checkable: {
@@ -114,6 +119,9 @@ export interface CatalogProperty {
   oneOf?: CatalogProperty[];
   anyOf?: CatalogProperty[];
   allOf?: CatalogProperty[];
+  properties?: Record<string, CatalogProperty>;
+  additionalProperties?: boolean;
+  const?: unknown;
 }
 
 /**
@@ -347,16 +355,39 @@ function propertyToSchema(prop: CatalogProperty): Record<string, unknown> {
     schema['description'] = prop.description;
   }
 
-  if (prop.enum) {
-    schema['enum'] = prop.enum;
-  }
+  // NOTE: enum is intentionally NOT copied into the Ajv validation schema.
+  // Enums are soft hints for the LLM (shown in the prompt via generateCatalogPrompt)
+  // but not hard constraints — e.g. Material Symbols supports thousands of icon
+  // names beyond the curated catalog list.
 
   if (prop.default !== undefined) {
     schema['default'] = prop.default;
   }
 
+  if (prop.const !== undefined) {
+    schema['const'] = prop.const;
+  }
+
   if (prop.type === 'array' && prop.items) {
     schema['items'] = propertyToSchema(prop.items);
+  }
+
+  // Preserve inner object structure for strict validation of known properties
+  if (prop.type === 'object') {
+    if (prop.properties) {
+      const innerProps: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(prop.properties)) {
+        innerProps[k] = propertyToSchema(v);
+      }
+      schema['properties'] = innerProps;
+    }
+    const rawProp = prop as Record<string, unknown>;
+    if (Array.isArray(rawProp['required'])) {
+      schema['required'] = rawProp['required'];
+    }
+    if (prop.additionalProperties !== undefined) {
+      schema['additionalProperties'] = prop.additionalProperties;
+    }
   }
 
   return schema;
@@ -366,6 +397,77 @@ function propertyToSchema(prop: CatalogProperty): Record<string, unknown> {
  * Generates the system prompt injection for the catalog.
  */
 const catalogPromptCache = new WeakMap<Catalog, string>();
+
+/**
+ * Formats a catalog property type into a compact, TypeScript-like string.
+ * @param prop The property schema
+ * @param depth Current recursion depth (capped at 2)
+ */
+function formatPropertyType(prop: CatalogProperty, depth = 0): string {
+  if (depth > 2) return 'any';
+
+  // 1. $ref handling
+  if (prop.$ref) {
+    const base = prop.$ref.split('/').pop() || 'unknown';
+    if (base === 'DataBinding') return '{"path":"..."}';
+    if (base === 'ChildList') return 'string[] | ChildTemplate';
+    if (base === 'ComponentId') return 'ComponentId';
+    if (base === 'Action') return 'Action';
+    
+    if (base.startsWith('Dynamic')) {
+      const plainType = base.replace('Dynamic', '').toLowerCase();
+      // Special case for DynamicStringList -> array -> string[]
+      const t = plainType === 'stringlist' ? 'string[]' : plainType;
+      return `${t} | {"path":"..."} | {"call":"..."}`;
+    }
+    return base;
+  }
+
+  // 2. Enum values (if type is string/number)
+  if (prop.enum && prop.enum.length > 0) {
+    // We handle the values display at the property line level, so just return the base type
+    return prop.type || 'string';
+  }
+
+  // 3. Arrays
+  if (prop.type === 'array') {
+    if (prop.items) {
+      const itemType = formatPropertyType(prop.items, depth + 1);
+      return `array[${itemType}]`;
+    }
+    return 'array';
+  }
+
+  // 4. Objects (inline schema extraction)
+  if (prop.type === 'object' && prop.properties) {
+    const props: string[] = [];
+    for (const [key, val] of Object.entries(prop.properties)) {
+      const isReq = prop.required && Array.isArray(prop.required) ? prop.required.includes(key) : false;
+      const t = formatPropertyType(val, depth + 1);
+      props.push(`${key}${isReq ? '' : '?'}: ${t}`);
+    }
+    return `{${props.join(', ')}}`;
+  }
+
+  // 5. oneOf / anyOf
+  if (prop.oneOf || prop.anyOf) {
+    const branches = (prop.oneOf ?? prop.anyOf)!;
+    const types = branches.map(b => formatPropertyType(b, depth + 1));
+    return types.filter(t => t !== 'any').join(' | ') || 'any';
+  }
+
+  // 6. allOf
+  if (prop.allOf) {
+    // allOf in properties is usually used for conditional constraints,
+    // find the first branch with actual type information
+    const primary = prop.allOf.find(b => b.$ref || b.type);
+    if (primary) {
+      return formatPropertyType(primary, depth + 1);
+    }
+  }
+
+  return prop.type || 'any';
+}
 
 export function generateCatalogPrompt(catalog: Catalog): string {
   const cached = catalogPromptCache.get(catalog);
@@ -455,67 +557,24 @@ export function generateCatalogPrompt(catalog: Catalog): string {
       for (const [propName, prop] of Object.entries(allProps)) {
         if (propName === 'component') continue;
 
-        // Handle $ref types for display
-        let typeStr: string | undefined = prop.type as string | undefined;
-        if (!typeStr && (prop.oneOf || prop.anyOf)) {
-          const branches = (prop.oneOf ?? prop.anyOf)!;
-          typeStr = branches
-            .map(b => {
-              if (b.$ref) {
-                const base = b.$ref.split('/').pop() || 'unknown';
-                if (base === 'DataBinding') return '{"path":"..."}';
-                if (base.startsWith('Dynamic')) return base.replace('Dynamic', '').toLowerCase();
-                return base;
-              }
-              if (b.type === 'array') return 'array[object]';
-              return b.type ?? 'any';
-            })
-            .join(' | ');
-        } else if (!typeStr && prop.allOf) {
-          // allOf: find the first branch with a meaningful $ref or type (other branches are typically constraints)
-          const primary = prop.allOf.find((b: CatalogProperty) => b.$ref || b.type);
-          if (primary?.$ref) {
-            const base = primary.$ref.split('/').pop() || 'unknown';
-            if (base.startsWith('Dynamic')) {
-              const plainType = base.replace('Dynamic', '').toLowerCase();
-              typeStr = `${plainType} | {"path":"..."} | {"call":"..."}`;
-            } else {
-              typeStr = base;
-            }
-          } else if (primary?.type) {
-            typeStr = primary.type as string;
-          }
-        } else if (!typeStr && prop.$ref) {
-          const ref = prop.$ref;
-          const baseType = ref.split('/').pop() || 'unknown';
+        // Get robust compact type string
+        const typeStr = formatPropertyType(prop);
 
-          if (baseType.startsWith('Dynamic')) {
-            const plainType = baseType.replace('Dynamic', '').toLowerCase();
-            typeStr = `${plainType} | {"path":"..."} | {"call":"..."}`;
-          } else if (baseType === 'ChildList') {
-            typeStr = 'string[] | ChildTemplate';
-          } else {
-            typeStr = baseType;
-          }
-        } else if (typeStr === 'array' && prop.items) {
-          let itemTypeStr: string | undefined = prop.items.type as string | undefined;
-          if (!itemTypeStr && prop.items.$ref) {
-            const ref = prop.items.$ref;
-            const baseType = ref.split('/').pop() || 'unknown';
-            if (baseType.startsWith('Dynamic')) {
-              itemTypeStr = `${baseType.replace('Dynamic', '').toLowerCase()} | {"path":"..."} | {"call":"..."}`;
-            } else if (baseType === 'ChildList') {
-              itemTypeStr = 'string[] | ChildTemplate';
-            } else {
-              itemTypeStr = baseType;
+        // Extract enum values — check top-level first, then drill into oneOf/anyOf branches
+        let enumValues = prop.enum;
+        if ((!enumValues || enumValues.length === 0) && (prop.oneOf || prop.anyOf)) {
+          for (const branch of (prop.oneOf ?? prop.anyOf)!) {
+            if (branch.enum && branch.enum.length > 0) {
+              enumValues = branch.enum;
+              break;
             }
           }
-          typeStr = `array[${itemTypeStr || 'unknown'}]`;
         }
-
-        const enumSuffix = prop.enum && prop.enum.length > 0 ? ` (values: ${prop.enum.join(', ')})` : '';
+        
+        const enumSuffix = enumValues && enumValues.length > 0 ? ` (values: ${enumValues.join(', ')})` : '';
+        const defaultSuffix = prop.default !== undefined ? ` (default: ${JSON.stringify(prop.default)})` : '';
         const desc = prop.description ? ` — ${prop.description}` : '';
-        const line = `    - ${propName}: ${typeStr}${enumSuffix}${desc}`;
+        const line = `    - ${propName}: ${typeStr}${enumSuffix}${defaultSuffix}${desc}`;
 
         if (requiredFields.has(propName)) {
           reqProps.push(line);
@@ -555,6 +614,9 @@ export function generateCatalogPrompt(catalog: Catalog): string {
       // Build parameter signature from schema items
       const params = func.parameters as Record<string, unknown> | undefined;
       const items = params?.['items'];
+      const allOfParams = params?.['allOf'];
+      const props = params?.['properties'] as Record<string, unknown>;
+      
       let sig = '';
       if (Array.isArray(items) && items.length > 0) {
         const paramParts = items.map((item: Record<string, unknown>, i: number) => {
@@ -563,7 +625,7 @@ export function generateCatalogPrompt(catalog: Catalog): string {
           const ref = item['$ref'] as string | undefined;
           let typeName = 'any';
           if (ref) {
-            const base = ref.split('/').pop() || '';
+            const base = ref.split('/').pop() || 'any';
             typeName = base.startsWith('Dynamic') ? base.replace('Dynamic', '').toLowerCase() : base;
           } else if (item['type']) {
             typeName = item['type'] as string;
@@ -574,6 +636,18 @@ export function generateCatalogPrompt(catalog: Catalog): string {
           return `${label}${optional ? '?' : ''}${desc ? ` /* ${desc} */` : ''}`;
         });
         sig = `(${paramParts.join(', ')})`;
+      } else if (allOfParams && Array.isArray(allOfParams)) {
+        // Fallback for openUrl which uses allOf -> {properties: {url: ...}}
+        const argsObj = allOfParams.find(p => p.type === 'object' && p.properties);
+        if (argsObj && argsObj.properties) {
+           const keys = Object.keys(argsObj.properties);
+           sig = `(${keys.map(k => `${k}: ${(argsObj.properties[k] as any).type || 'any'}`).join(', ')})`;
+        } else {
+           sig = '()';
+        }
+      } else if (props) {
+        const keys = Object.keys(props);
+        sig = `(${keys.map(k => `${k}: ${(props[k] as any).type || 'any'}`).join(', ')})`;
       } else {
         sig = '()';
       }
@@ -636,17 +710,60 @@ export function validateComponent(
     return { valid: false, errors: [`Could not build validator for component: ${componentType}`] };
   }
 
+  const errors: string[] = [];
+
   const valid = validator(props);
-  if (valid) return { valid: true, errors: [] };
+  if (!valid) {
+    errors.push(
+      ...(validator.errors ?? []).map(err => {
+        const field = err.instancePath
+          ? err.instancePath.replace(/^\//, '')
+          : (err.params as any)?.missingProperty ?? 'field';
+        return `${field}: ${err.message}`;
+      })
+    );
+  }
 
-  const errors = (validator.errors ?? []).map(err => {
-    const field = err.instancePath
-      ? err.instancePath.replace(/^\//, '')
-      : (err.params as any)?.missingProperty ?? 'field';
-    return `${field}: ${err.message}`;
-  });
+  // Validate function calls reference known catalog functions
+  const funcErrors = validateFunctionCalls(catalog, props);
+  errors.push(...funcErrors);
 
-  return { valid: false, errors };
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Recursively walks component property values and validates that any
+ * `{call: "functionName"}` objects reference functions defined in the catalog.
+ * Returns error strings for unknown function names.
+ */
+function validateFunctionCalls(
+  catalog: Catalog,
+  props: Record<string, unknown>
+): string[] {
+  const knownFunctions = catalog.functions ? new Set(Object.keys(catalog.functions)) : new Set<string>();
+  const errors: string[] = [];
+
+  function walk(value: unknown, path: string): void {
+    if (value === null || value === undefined) return;
+
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      const obj = value as Record<string, unknown>;
+      if (typeof obj['call'] === 'string') {
+        const fnName = obj['call'];
+        if (knownFunctions.size > 0 && !knownFunctions.has(fnName)) {
+          errors.push(`${path}: unknown function '${fnName}' (available: ${[...knownFunctions].join(', ')})`);
+        }
+      }
+      for (const [key, val] of Object.entries(obj)) {
+        walk(val, path ? `${path}.${key}` : key);
+      }
+    } else if (Array.isArray(value)) {
+      value.forEach((item, i) => walk(item, `${path}[${i}]`));
+    }
+  }
+
+  walk(props, '');
+  return errors;
 }
 
 // Zod schemas for runtime validation

@@ -14,13 +14,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-#export CATALOG_LOG_DIR="${CATALOG_LOG_DIR:-$SCRIPT_DIR/.freesail_logs}"
+export CATALOG_LOG_DIR="${CATALOG_LOG_DIR:-$SCRIPT_DIR/.freesail_logs}"
 
 # Load .env if present
-if [ -f "$SCRIPT_DIR/.env" ]; then
+if [ -f "$SCRIPT_DIR/agent/.env" ]; then
   set -a
   # shellcheck source=/dev/null
-  source "$SCRIPT_DIR/.env"
+  echo -e "${BLUE}Loading environment variables from .env...${NC}"
+  source "$SCRIPT_DIR/agent/.env"
   set +a
 fi
 
@@ -50,11 +51,29 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Check for Google API key (can be set in .env)
-if [ -z "$GOOGLE_API_KEY" ]; then
+if [ -z "$GOOGLE_API_KEY" ] && [ "$LLM_PROVIDER" = "gemini" ]; then
   echo -e "${RED}Error: GOOGLE_API_KEY environment variable is required${NC}"
   echo ""
   echo "Get an API key from: https://aistudio.google.com/app/apikey"
   echo "Then run: export GOOGLE_API_KEY=your-api-key"
+  exit 1
+fi
+
+# Check for OpenAI API key if using OpenAI provider
+if [ -z "$OPENAI_API_KEY" ] && [ "$LLM_PROVIDER" = "openai" ]; then
+  echo -e "${RED}Error: OPENAI_API_KEY environment variable is required${NC}"
+  echo ""
+  echo "Get an API key from: https://platform.openai.com/account/api-keys"
+  echo "Then run: export OPENAI_API_KEY=your-api-key"
+  exit 1
+fi
+
+# Check for Anthropic API key if using Anthropic provider
+if [ -z "$ANTHROPIC_API_KEY" ] && [ "$LLM_PROVIDER" = "claude" ]; then
+  echo -e "${RED}Error: ANTHROPIC_API_KEY environment variable is required${NC}"
+  echo ""
+  echo "Get an API key from: https://claude.ai/account/api-keys"
+  echo "Then run: export ANTHROPIC_API_KEY=your-api-key"
   exit 1
 fi
 

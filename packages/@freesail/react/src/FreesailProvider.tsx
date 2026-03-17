@@ -20,6 +20,7 @@ import {
   isUpdateComponentsMessage,
   isUpdateDataModelMessage,
   isDeleteSurfaceMessage,
+  isGetDataModelMessage,
   type SurfaceManager,
   type A2UITransport,
   type TransportOptions,
@@ -120,6 +121,17 @@ export function FreesailProvider({
 
     // Handle incoming messages
     newTransport.on('message', (message: DownstreamMessage) => {
+      if (isGetDataModelMessage(message)) {
+        const { surfaceId } = message.getDataModel;
+        const dataModel = surfaceManager.getDataModel(surfaceId);
+        newTransport.sendAction(
+          surfaceId,
+          '__get_data_model_response',
+          '__system' as ComponentId,
+          { current_data_model: dataModel ?? {} }
+        );
+        return;
+      }
       handleMessage(message, surfaceManager, agentDeletedRef.current);
     });
 
@@ -216,13 +228,14 @@ export function FreesailProvider({
         return;
       }
 
-      // Always send all surface data models that have sendDataModel enabled.
-      // This ensures the agent can see all form/input state across all surfaces,
-      // not just the one that triggered this action.
-      const allDataModels = surfaceManager.getAllSendableDataModels();
-      const dataModel = Object.keys(allDataModels).length > 0
-        ? { surfaceId, dataModel: allDataModels }
-        : undefined;
+      // Send only the data model of the surface that triggered the action.
+      let dataModel: { surfaceId: SurfaceId; dataModel: Record<string, unknown> } | undefined;
+      if (surfaceManager.shouldSendDataModel(surfaceId)) {
+        const model = surfaceManager.getDataModel(surfaceId);
+        if (model && Object.keys(model).length > 0) {
+          dataModel = { surfaceId, dataModel: model };
+        }
+      }
 
       await transport.sendAction(surfaceId, name, sourceComponentId, context, dataModel);
     },

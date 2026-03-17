@@ -29,6 +29,7 @@ function getSurfaceId(message: DownstreamMessage): string | null {
     ?? m.updateComponents?.surfaceId
     ?? m.updateDataModel?.surfaceId
     ?? m.deleteSurface?.surfaceId
+    ?? m.getDataModel?.surfaceId
     ?? null;
 }
 
@@ -105,6 +106,7 @@ export class SessionManager {
   private sessionToAgent: Map<string, string> = new Map();
   private sessionEventListeners: Map<keyof SessionManagerEvents, Array<(...args: any[]) => void>> = new Map();
   private offlineAgentActions: Map<string, Array<{ sessionId: string, actions: UpstreamMessage[] }>> = new Map();
+  private pendingDataModelRequests: Map<string, { resolve: (data: Record<string, unknown>) => void; timer: ReturnType<typeof setTimeout> }> = new Map();
   private options: Required<SessionManagerOptions>;
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -759,6 +761,58 @@ export class SessionManager {
     this.offlineAgentActions.clear();
     this.agentBindings.clear();
     this.sessionToAgent.clear();
+    for (const pending of this.pendingDataModelRequests.values()) {
+      clearTimeout(pending.timer);
+    }
+    this.pendingDataModelRequests.clear();
+  }
+
+  // ==========================================================================
+  // Data Model Request/Response
+  // ==========================================================================
+
+  /**
+   * Request the current data model from the client for a surface.
+   * Sends a getDataModel downstream message and returns a Promise that
+   * resolves when the client responds with __get_data_model_response.
+   */
+  requestDataModel(sessionId: string, surfaceId: SurfaceId, timeoutMs = 10_000): Promise<Record<string, unknown>> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return Promise.reject(new Error(`Session ${sessionId} not found`));
+    }
+
+    const message: DownstreamMessage = {
+      version: A2UI_VERSION,
+      getDataModel: { surfaceId },
+    } as DownstreamMessage;
+
+    this.sendToSession(sessionId, message);
+
+    const key = `${sessionId}:${surfaceId}`;
+    return new Promise<Record<string, unknown>>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingDataModelRequests.delete(key);
+        reject(new Error(`Timed out waiting for data model response from client (surface: ${surfaceId})`));
+      }, timeoutMs);
+
+      this.pendingDataModelRequests.set(key, { resolve, timer });
+    });
+  }
+
+  /**
+   * Resolve a pending data model request when the client responds.
+   * Returns true if a pending request was found and resolved.
+   */
+  resolveDataModelRequest(sessionId: string, surfaceId: string, dataModel: Record<string, unknown>): boolean {
+    const key = `${sessionId}:${surfaceId}`;
+    const pending = this.pendingDataModelRequests.get(key);
+    if (!pending) return false;
+
+    clearTimeout(pending.timer);
+    this.pendingDataModelRequests.delete(key);
+    pending.resolve(dataModel);
+    return true;
   }
 
   // ==========================================================================
