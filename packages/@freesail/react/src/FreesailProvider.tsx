@@ -145,7 +145,7 @@ export function FreesailProvider({
       newTransport.sendAction(
         surfaceId,
         'surface_deleted',
-        'system' as ComponentId,
+        '__system' as ComponentId,
         { surfaceId, reason: 'client' }
       );
     });
@@ -156,7 +156,7 @@ export function FreesailProvider({
       newTransport.sendAction(
         surfaceId,
         'surface_cleanup_reminder',
-        'system' as ComponentId,
+        '__system' as ComponentId,
         { surfaceId, message: 'Delete this surface if it is no longer needed. Ignore if you plan to use it.' }
       );
     });

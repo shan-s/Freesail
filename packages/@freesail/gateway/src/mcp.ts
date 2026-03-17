@@ -26,6 +26,26 @@ import { generateCatalogPrompt, validateComponent } from './converter.js';
 import type { SessionManager } from './session.js';
 
 /**
+ * Recursively strip null values from an object, converting them to undefined
+ * so JSON.stringify omits them. LLMs frequently send null for optional fields.
+ */
+function stripNulls<T>(obj: T): T {
+  if (Array.isArray(obj)) {
+    return obj.map(stripNulls) as T;
+  }
+  if (obj !== null && typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (value !== null) {
+        result[key] = stripNulls(value);
+      }
+    }
+    return result as T;
+  }
+  return obj;
+}
+
+/**
  * Validates whether an agent has permission to perform an operation on a surface,
  * and whether the surface ID conforms to naming rules.
  * 
@@ -250,15 +270,7 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
         components: z.array(z.object({
           id: z.string().describe('Component ID (use "root" for the root component)'),
           component: z.string().describe('Component type from catalog (e.g., "Text", "Column", "Button")'),
-          child: z.string().optional().describe('ID of single child component (for Card, Modal)'),
-          children: z.union([
-            z.array(z.string()),
-            z.object({
-              componentId: z.string(),
-              path: z.string(),
-            }),
-          ]).optional().describe('IDs of child components or template for dynamic children'),
-        }).passthrough()).describe('Array of component definitions'),
+        }).passthrough()).describe('Array of component definitions. Use child/children properties as specified in the catalog.'),
       },
     },
     async ({ surfaceId, sessionId, components }) => {
@@ -301,7 +313,7 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
         version: A2UI_VERSION,
         updateComponents: {
           surfaceId: surfaceId as SurfaceId,
-          components: components as A2UIComponent[],
+          components: stripNulls(components) as A2UIComponent[],
         },
       };
       const result = sendToSession(message, sessionId);

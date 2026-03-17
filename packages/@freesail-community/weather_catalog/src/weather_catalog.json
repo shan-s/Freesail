@@ -76,7 +76,8 @@
             },
             "background": {
               "$ref": "./common/common_types.json#/$defs/DynamicString",
-              "description": "Background color override"
+              "description": "Background color override",
+              "default": "bgSurface"
             }
           },
           "required": [
