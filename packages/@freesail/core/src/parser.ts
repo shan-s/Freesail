@@ -116,7 +116,6 @@ export class A2UIParser {
           errors.push(error);
         }
 
-        searchStart = result.endIndex + 1;
         // Update buffer to remove processed content
         this.buffer = this.buffer.substring(result.endIndex + 1);
         searchStart = 0; // Reset since we modified the buffer

@@ -365,8 +365,10 @@ export class A2UITransport {
     for (const message of result.messages) {
       // Auto-register surface→session mapping when we receive createSurface
       if ('createSurface' in message && this._sessionId) {
-        const surfaceId = (message as Record<string, any>)['createSurface'].surfaceId;
-        this.registerSurfaceWithGateway(surfaceId);
+        const createSurface = (message as unknown as Record<string, unknown>)['createSurface'];
+        if (createSurface && typeof createSurface === 'object' && 'surfaceId' in createSurface) {
+          this.registerSurfaceWithGateway(createSurface.surfaceId as string);
+        }
       }
 
       this.emit('message', message);
@@ -395,7 +397,7 @@ export class A2UITransport {
         }),
       });
     } catch (error) {
-      console.error('[Transport] Failed to register surface:', error);
+      this.emit('error', error instanceof Error ? error : new Error(String(error)));
     }
   }
 

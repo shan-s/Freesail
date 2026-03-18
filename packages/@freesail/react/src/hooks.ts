@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { SurfaceId, Surface, JsonPointer, ComponentId } from '@freesail/core';
 import { useFreesailContext } from './context.js';
+import { getDataAtPath } from './utils.js';
 
 /**
  * Hook to access and subscribe to a specific surface.
@@ -36,13 +37,15 @@ export function useSurface(surfaceId: SurfaceId): Surface | undefined {
 
     const unsubComponents = surfaceManager.on('componentsUpdated', (updatedId: SurfaceId) => {
       if (updatedId === surfaceId) {
-        setSurface({ ...getSurface(surfaceId)! });
+        const current = getSurface(surfaceId);
+        setSurface(current ? { ...current } : undefined);
       }
     });
 
     const unsubData = surfaceManager.on('dataModelUpdated', (updatedId: SurfaceId) => {
       if (updatedId === surfaceId) {
-        setSurface({ ...getSurface(surfaceId)! });
+        const current = getSurface(surfaceId);
+        setSurface(current ? { ...current } : undefined);
       }
     });
 
@@ -152,31 +155,6 @@ export function useSurfaces(): Surface[] {
   }, [surfaceManager]);
 
   return surfaces;
-}
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function getDataAtPath(
-  data: Record<string, unknown>,
-  path?: JsonPointer
-): unknown {
-  if (!path || path === '/') {
-    return data;
-  }
-
-  const parts = path.split('/').filter((p) => p !== '');
-  let current: unknown = data;
-
-  for (const part of parts) {
-    if (current === null || typeof current !== 'object') {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[part];
-  }
-
-  return current;
 }
 
 /**

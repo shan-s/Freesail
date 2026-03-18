@@ -127,7 +127,8 @@ export class SurfaceManager {
     // timeout, emit a surfaceOrphan event so the client can remind the
     // agent to clean up. Client-managed surfaces (__) are exempt.
     if (!surfaceId.startsWith('__') && this.orphanTimeout > 0) {
-      this.orphanTimers.get(surfaceId) && clearTimeout(this.orphanTimers.get(surfaceId)!);
+      const existingOrphanTimer = this.orphanTimers.get(surfaceId);
+      if (existingOrphanTimer) clearTimeout(existingOrphanTimer);
       const timer = setTimeout(() => {
         this.orphanTimers.delete(surfaceId);
         const s = this.surfaces.get(surfaceId);
@@ -467,20 +468,6 @@ export class SurfaceManager {
     }
   }
 
-  private flattenObject(
-    obj: Record<string, unknown>,
-    prefix: string,
-    result: Record<string, unknown>
-  ): void {
-    for (const [key, value] of Object.entries(obj)) {
-      const path = `${prefix}/${key}`;
-      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-        this.flattenObject(value as Record<string, unknown>, path, result);
-      } else {
-        result[path] = value;
-      }
-    }
-  }
 }
 
 /**

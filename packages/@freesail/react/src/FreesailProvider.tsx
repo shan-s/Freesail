@@ -84,6 +84,18 @@ export function FreesailProvider({
   const [isConnected, setIsConnected] = useState(false);
   // Track surfaces deleted by agent messages so we don't echo them back
   const agentDeletedRef = useRef<Set<string>>(new Set());
+  // Refs for callbacks so the transport effect always uses current values
+  // without needing to be recreated when callbacks change
+  const onConnectionChangeRef = useRef(onConnectionChange);
+  const onErrorRef = useRef(onError);
+  const catalogDefinitionsRef = useRef(catalogDefinitions);
+  const autoConnectRef = useRef(autoConnect);
+  useEffect(() => {
+    onConnectionChangeRef.current = onConnectionChange;
+    onErrorRef.current = onError;
+    catalogDefinitionsRef.current = catalogDefinitions;
+    autoConnectRef.current = autoConnect;
+  });
 
   // Register custom catalog definitions
   useEffect(() => {
@@ -179,19 +191,20 @@ export function FreesailProvider({
     newTransport.on('stateChange', (state: string) => {
       const connected = state === 'connected';
       setIsConnected(connected);
-      
+
       if (state === 'disconnected') {
         // Clear all surfaces when connection is lost
         surfaceManager.clearSurfaces();
       }
-      
-      onConnectionChange?.(connected);
+
+      onConnectionChangeRef.current?.(connected);
     });
 
     // When session starts, register catalog schemas with the gateway
     newTransport.on('sessionStart', (_sessionId: string) => {
-      if (catalogDefinitions.length > 0) {
-        const schemas = catalogDefinitions
+      const defs = catalogDefinitionsRef.current;
+      if (defs.length > 0) {
+        const schemas = defs
           .map((def) => def.schema)
           .filter((s) => s && Object.keys(s).length > 0);
 
@@ -208,13 +221,13 @@ export function FreesailProvider({
     // Handle errors
     newTransport.on('error', (error: Error) => {
       console.error('[Freesail] Transport error:', error);
-      onError?.(error);
+      onErrorRef.current?.(error);
     });
 
     setTransport(newTransport);
 
     // Auto-connect if enabled
-    if (autoConnect) {
+    if (autoConnectRef.current) {
       newTransport.connect();
     }
 

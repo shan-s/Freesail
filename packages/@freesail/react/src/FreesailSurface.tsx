@@ -22,6 +22,7 @@ import type {
 import { useSurface, useAction } from './hooks.js';
 import { registry, type FreesailComponentProps } from './registry.js';
 import { useFreesailContext } from './context.js';
+import { getDataAtPath } from './utils.js';
 import type { FunctionImplementation } from './types.js';
 
 /**
@@ -258,8 +259,10 @@ function resolveDataBindings(
   dataModel: Record<string, unknown>,
   catalogId: string,
   scopeData?: unknown,
-  scopeBasePath?: string
+  scopeBasePath?: string,
+  _depth = 0
 ): Record<string, unknown> {
+  if (_depth > 10) return {};
   const resolved: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(component)) {
@@ -321,12 +324,12 @@ function resolveDataBindings(
             if (isDataBindingObject(item)) {
               return resolveSingleBinding(item, dataModel, scopeData);
             }
-            return resolveDataBindings(item as any, dataModel, catalogId, scopeData);
+            return resolveDataBindings(item as any, dataModel, catalogId, scopeData, undefined, _depth + 1);
           }
           return item;
         });
       } else {
-        resolved[key] = resolveDataBindings(value as any, dataModel, catalogId, scopeData);
+        resolved[key] = resolveDataBindings(value as any, dataModel, catalogId, scopeData, undefined, _depth + 1);
       }
     } else {
       resolved[key] = value;
@@ -528,22 +531,6 @@ function resolveActionContext(
   }
 
   return resolved;
-}
-
-function getDataAtPath(data: unknown, path: string): unknown {
-  if (data === null || data === undefined) return undefined;
-
-  const parts = path.split('/').filter((p) => p !== '');
-  let current: unknown = data;
-
-  for (const part of parts) {
-    if (current === null || typeof current !== 'object') {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[part];
-  }
-
-  return current;
 }
 
 // =============================================================================
