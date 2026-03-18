@@ -215,9 +215,14 @@
           "enum": ["string", "number", "boolean", "array", "object", "void", "any"],
           "description": "The value type this function returns."
         },
+        "args": {
+          "type": "object",
+          "description": "JSON Schema describing the accepted arguments as an object with named properties. Used for documentation and tooling only.",
+          "additionalProperties": true
+        },
         "parameters": {
           "type": "object",
-          "description": "JSON Schema describing the accepted arguments. Typically { type: 'array', items: [...], minItems: N } for positional args. Not evaluated at runtime — used for documentation and tooling only.",
+          "description": "Deprecated. Use 'args' instead. Legacy positional array format for function arguments.",
           "additionalProperties": true
         }
       }

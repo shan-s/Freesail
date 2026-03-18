@@ -147,6 +147,7 @@ export interface Catalog {
   components: Record<string, CatalogComponent>;
   functions?: Record<string, {
     description?: string;
+    args?: Record<string, unknown>;
     parameters?: Record<string, unknown>;
     returnType?: string;
   }>;
@@ -608,46 +609,71 @@ export function generateCatalogPrompt(catalog: Catalog): string {
   const funcEntries = catalog.functions ? Object.entries(catalog.functions) : [];
   if (funcEntries.length > 0) {
     lines.push('### Available Functions:', '');
-    lines.push('Function args are **positional**. When using named-key objects, use the parameter names below as keys in the correct order.');
+    lines.push('Use the `args` object to pass named arguments to functions. Use the argument names documented below as keys.');
     lines.push('');
     for (const [name, func] of funcEntries) {
-      // Build parameter signature from schema items
+      // Build parameter signature from schema
+      const argsDef = func.args as Record<string, unknown> | undefined;
       const params = func.parameters as Record<string, unknown> | undefined;
-      const items = params?.['items'];
-      const allOfParams = params?.['allOf'];
-      const props = params?.['properties'] as Record<string, unknown>;
-      
+
       let sig = '';
-      if (Array.isArray(items) && items.length > 0) {
-        const paramParts = items.map((item: Record<string, unknown>, i: number) => {
-          const paramName = item['name'] as string | undefined;
-          const desc = item['description'] as string | undefined;
-          const ref = item['$ref'] as string | undefined;
+      // Prefer new args.properties format
+      const argsProps = argsDef?.['properties'] as Record<string, unknown> | undefined;
+      const argsRequired = argsDef?.['required'] as string[] | undefined;
+      if (argsProps && Object.keys(argsProps).length > 0) {
+        const requiredSet = new Set(argsRequired ?? []);
+        const paramParts = Object.entries(argsProps).map(([argName, argSchema]) => {
+          const schema = argSchema as Record<string, unknown>;
+          const desc = schema['description'] as string | undefined;
+          const ref = schema['$ref'] as string | undefined;
           let typeName = 'any';
           if (ref) {
             const base = ref.split('/').pop() || 'any';
             typeName = base.startsWith('Dynamic') ? base.replace('Dynamic', '').toLowerCase() : base;
-          } else if (item['type']) {
-            typeName = item['type'] as string;
+          } else if (schema['type']) {
+            typeName = schema['type'] as string;
           }
-          const minItems = params?.['minItems'] as number | undefined;
-          const optional = minItems !== undefined && i >= minItems;
-          const label = paramName ? `${paramName}: ${typeName}` : typeName;
-          return `${label}${optional ? '?' : ''}${desc ? ` /* ${desc} */` : ''}`;
+          const optional = !requiredSet.has(argName);
+          return `${argName}: ${typeName}${optional ? '?' : ''}${desc ? ` /* ${desc} */` : ''}`;
         });
         sig = `(${paramParts.join(', ')})`;
-      } else if (allOfParams && Array.isArray(allOfParams)) {
-        // Fallback for openUrl which uses allOf -> {properties: {url: ...}}
-        const argsObj = allOfParams.find(p => p.type === 'object' && p.properties);
-        if (argsObj && argsObj.properties) {
-           const keys = Object.keys(argsObj.properties);
-           sig = `(${keys.map(k => `${k}: ${(argsObj.properties[k] as any).type || 'any'}`).join(', ')})`;
+      } else if (params) {
+        // Fallback: legacy parameters format
+        const items = params['items'];
+        const allOfParams = params['allOf'];
+        const props = params['properties'] as Record<string, unknown>;
+        if (Array.isArray(items) && items.length > 0) {
+          const paramParts = items.map((item: Record<string, unknown>, i: number) => {
+            const paramName = item['name'] as string | undefined;
+            const desc = item['description'] as string | undefined;
+            const ref = item['$ref'] as string | undefined;
+            let typeName = 'any';
+            if (ref) {
+              const base = ref.split('/').pop() || 'any';
+              typeName = base.startsWith('Dynamic') ? base.replace('Dynamic', '').toLowerCase() : base;
+            } else if (item['type']) {
+              typeName = item['type'] as string;
+            }
+            const minItems = params?.['minItems'] as number | undefined;
+            const optional = minItems !== undefined && i >= minItems;
+            const label = paramName ? `${paramName}: ${typeName}` : typeName;
+            return `${label}${optional ? '?' : ''}${desc ? ` /* ${desc} */` : ''}`;
+          });
+          sig = `(${paramParts.join(', ')})`;
+        } else if (allOfParams && Array.isArray(allOfParams)) {
+          const argsObj = (allOfParams as any[]).find((p: any) => p.type === 'object' && p.properties);
+          if (argsObj && argsObj.properties) {
+             const keys = Object.keys(argsObj.properties);
+             sig = `(${keys.map(k => `${k}: ${(argsObj.properties[k] as any).type || 'any'}`).join(', ')})`;
+          } else {
+             sig = '()';
+          }
+        } else if (props) {
+          const keys = Object.keys(props);
+          sig = `(${keys.map(k => `${k}: ${(props[k] as any).type || 'any'}`).join(', ')})`;
         } else {
-           sig = '()';
+          sig = '()';
         }
-      } else if (props) {
-        const keys = Object.keys(props);
-        sig = `(${keys.map(k => `${k}: ${(props[k] as any).type || 'any'}`).join(', ')})`;
       } else {
         sig = '()';
       }
@@ -791,6 +817,7 @@ const catalogComponentSchema = z.object({
 const catalogFunctionSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
+  args: z.record(z.unknown()).optional(),
   parameters: z.record(z.unknown()).optional(),
   returnType: z.string().optional(),
 }).passthrough();

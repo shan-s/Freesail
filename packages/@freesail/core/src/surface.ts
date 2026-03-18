@@ -5,13 +5,14 @@
  * data models, and theme settings.
  */
 
-import type {
-  SurfaceId,
-  CatalogId,
-  ComponentId,
-  A2UIComponent,
-  JsonPointer,
-  ClientErrorCode,
+import {
+  isChildListTemplate,
+  type SurfaceId,
+  type CatalogId,
+  type ComponentId,
+  type A2UIComponent,
+  type JsonPointer,
+  type ClientErrorCode,
 } from './protocol.js';
 
 /**
@@ -64,6 +65,8 @@ export interface SurfaceManagerEvents {
   surfaceDeleted: (surfaceId: SurfaceId) => void;
   /** Fired when a surface has not received updateComponents within the orphan timeout */
   surfaceOrphan: (surfaceId: SurfaceId) => void;
+  /** Fired when components exist in the surface but aren't reachable from the root */
+  orphanComponents: (surfaceId: SurfaceId, componentIds: ComponentId[]) => void;
   componentsUpdated: (surfaceId: SurfaceId, components: A2UIComponent[]) => void;
   dataModelUpdated: (surfaceId: SurfaceId, path: JsonPointer, value: unknown) => void;
   error: (error: SurfaceError) => void;
@@ -82,6 +85,8 @@ export class SurfaceManager {
   > = new Map();
   /** Timers for auto-deleting surfaces that never receive updateComponents */
   private orphanTimers: Map<SurfaceId, ReturnType<typeof setTimeout>> = new Map();
+  /** Periodic timers for detecting orphan (unreachable) components */
+  private orphanComponentTimers: Map<SurfaceId, ReturnType<typeof setInterval>> = new Map();
   /** How long (ms) to wait for updateComponents before deleting a new surface (default: 60s) */
   orphanTimeout = 60_000;
 
@@ -154,6 +159,13 @@ export class SurfaceManager {
       this.orphanTimers.delete(surfaceId);
     }
 
+    // Cancel any pending orphan-component timer
+    const orphanComponentTimer = this.orphanComponentTimers.get(surfaceId);
+    if (orphanComponentTimer) {
+      clearInterval(orphanComponentTimer);
+      this.orphanComponentTimers.delete(surfaceId);
+    }
+
     this.surfaces.delete(surfaceId);
     this.emit('surfaceDeleted', surfaceId);
 
@@ -223,6 +235,17 @@ export class SurfaceManager {
     if (orphanTimer) {
       clearTimeout(orphanTimer);
       this.orphanTimers.delete(surfaceId);
+    }
+
+    // Start periodic orphan-component check if not already running
+    if (!this.orphanComponentTimers.has(surfaceId)) {
+      const timer = setInterval(() => {
+        const orphans = this.getOrphanComponents(surfaceId);
+        if (orphans.length > 0) {
+          this.emit('orphanComponents', surfaceId, orphans);
+        }
+      }, 15_000);
+      this.orphanComponentTimers.set(surfaceId, timer);
     }
 
     return true;
@@ -327,6 +350,50 @@ export class SurfaceManager {
     this.listeners.clear();
     for (const timer of this.orphanTimers.values()) clearTimeout(timer);
     this.orphanTimers.clear();
+    for (const timer of this.orphanComponentTimers.values()) clearInterval(timer);
+    this.orphanComponentTimers.clear();
+  }
+
+  /**
+   * Find component IDs that exist in the surface but are not reachable
+   * from the root component via child/children references.
+   */
+  getOrphanComponents(surfaceId: SurfaceId): ComponentId[] {
+    const surface = this.surfaces.get(surfaceId);
+    if (!surface || !surface.rootId || surface.components.size === 0) return [];
+
+    const reachable = new Set<ComponentId>();
+    const queue: ComponentId[] = [surface.rootId];
+
+    while (queue.length > 0) {
+      const id = queue.pop()!;
+      if (reachable.has(id)) continue;
+      reachable.add(id);
+
+      const comp = surface.components.get(id);
+      if (!comp) continue;
+
+      if (comp.child) {
+        queue.push(comp.child);
+      }
+      if (comp.children) {
+        if (Array.isArray(comp.children)) {
+          for (const childId of comp.children) {
+            queue.push(childId);
+          }
+        } else if (isChildListTemplate(comp.children)) {
+          queue.push(comp.children.componentId);
+        }
+      }
+    }
+
+    const orphans: ComponentId[] = [];
+    for (const id of surface.components.keys()) {
+      if (!reachable.has(id)) {
+        orphans.push(id);
+      }
+    }
+    return orphans;
   }
 
   // ==========================================================================

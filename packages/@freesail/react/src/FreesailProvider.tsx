@@ -161,7 +161,19 @@ export function FreesailProvider({
       );
     });
 
-
+    // When orphan components are detected, remind the agent to wire them up
+    const unsubOrphanComponents = surfaceManager.on('orphanComponents', (surfaceId: SurfaceId, componentIds: ComponentId[]) => {
+      newTransport.sendAction(
+        surfaceId,
+        'orphan_components_reminder',
+        '__system' as ComponentId,
+        {
+          surfaceId,
+          componentIds,
+          message: `The following components will not be rendered because they are not included as children of any parent component: ${componentIds.join(', ')}. Add them to a parent's children array or ignore if not needed.`,
+        }
+      );
+    });
 
     // Handle connection state changes
     newTransport.on('stateChange', (state: string) => {
@@ -210,6 +222,7 @@ export function FreesailProvider({
     return () => {
       unsubSurfaceDeleted();
       unsubOrphan();
+      unsubOrphanComponents();
       newTransport.disconnect();
       surfaceManager.dispose();
     };

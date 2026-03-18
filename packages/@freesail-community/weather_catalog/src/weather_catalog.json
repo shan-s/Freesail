@@ -769,80 +769,81 @@
     "formatString": {
       "description": "Performs string interpolation of data model values and other functions in the catalog functions list and returns the resulting string. The value string can contain interpolated expressions in the `${expression}` format. Supported expression types include: JSON Pointer paths to the data model (e.g., `${/absolute/path}` or `${relative/path}`), and client-side function calls (e.g., `${now()}`). Function arguments must be literals (quoted strings, numbers, booleans) or nested expressions (e.g., `${formatDate(${/currentDate}, 'MM-dd')}`). To include a literal `${` sequence, escape it as `\\${`.",
       "returnType": "string",
-      "parameters": {
-        "type": "array",
-        "items": [
-          {
-            "name": "format",
+      "args": {
+        "type": "object",
+        "properties": {
+          "value": {
             "description": "The format string.",
             "type": "string"
           }
-        ],
-        "additionalItems": {
-          "$ref": "./common/common_types.json#/$defs/DynamicValue"
         },
-        "minItems": 1
+        "required": [
+          "value"
+        ],
+        "additionalProperties": {
+          "$ref": "./common/common_types.json#/$defs/DynamicValue"
+        }
       }
     },
     "formatDate": {
       "description": "Formats a timestamp into a string using a pattern.",
       "returnType": "string",
-      "parameters": {
-        "type": "array",
-        "items": [
-          {
-            "name": "value",
+      "args": {
+        "type": "object",
+        "properties": {
+          "value": {
             "$ref": "./common/common_types.json#/$defs/DynamicValue",
             "description": "The date to format."
           },
-          {
-            "name": "pattern",
+          "pattern": {
             "$ref": "./common/common_types.json#/$defs/DynamicString",
             "description": "A Unicode TR35 date pattern string.\n\nToken Reference:\n- Year: 'yy' (26), 'yyyy' (2026)\n- Month: 'M' (1), 'MM' (01), 'MMM' (Jan), 'MMMM' (January)\n- Day: 'd' (1), 'dd' (01), 'E' (Tue), 'EEEE' (Tuesday)\n- Hour (12h): 'h' (1-12), 'hh' (01-12) - requires 'a' for AM/PM\n- Hour (24h): 'H' (0-23), 'HH' (00-23) - Military Time\n- Minute: 'mm' (00-59)\n- Second: 'ss' (00-59)\n- Period: 'a' (AM/PM)\n\nExamples:\n- 'MMM dd, yyyy' -> 'Jan 16, 2026'\n- 'HH:mm' -> '14:30' (Military)\n- 'h:mm a' -> '2:30 PM'\n- 'EEEE, d MMMM' -> 'Friday, 16 January'"
           }
-        ],
-        "minItems": 2
+        },
+        "required": [
+          "value",
+          "pattern"
+        ]
       }
     },
     "now": {
       "description": "Returns the current date and time as an ISO 8601 string.",
       "returnType": "string",
-      "parameters": {
-        "type": "array",
-        "items": [],
-        "maxItems": 0
+      "args": {
+        "type": "object",
+        "properties": {}
       }
     },
     "showComponent": {
       "description": "Shows a component by its ID. Use this to make Modals or any other component visible.",
       "returnType": "void",
-      "parameters": {
-        "type": "array",
-        "items": [
-          {
-            "name": "componentId",
+      "args": {
+        "type": "object",
+        "properties": {
+          "componentId": {
             "type": "string",
             "description": "The ID of the component to show."
           }
-        ],
-        "minItems": 1,
-        "maxItems": 1
+        },
+        "required": [
+          "componentId"
+        ]
       }
     },
     "hideComponent": {
       "description": "Hides a component by its ID. Use this to hide Modals or any other component.",
       "returnType": "void",
-      "parameters": {
-        "type": "array",
-        "items": [
-          {
-            "name": "componentId",
+      "args": {
+        "type": "object",
+        "properties": {
+          "componentId": {
             "type": "string",
             "description": "The ID of the component to hide."
           }
-        ],
-        "minItems": 1,
-        "maxItems": 1
+        },
+        "required": [
+          "componentId"
+        ]
       }
     }
   },

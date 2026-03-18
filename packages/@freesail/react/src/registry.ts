@@ -64,7 +64,7 @@ class ComponentRegistry {
   /**
    * Register a catalog with its components, functions, and optional schema.
    * When a schema is provided, parameter names are extracted from
-   * `functions.*.parameters.items[].name` so `evaluateFunction` can
+   * `functions.*.args.properties` keys so `evaluateFunction` can
    * reorder named-key argument objects from the LLM.
    */
   registerCatalog(
@@ -91,6 +91,16 @@ class ComponentRegistry {
     if (!funcs) return;
     const names: Record<string, string[]> = {};
     for (const [funcName, funcDef] of Object.entries(funcs)) {
+      const argsDef = funcDef['args'] as Record<string, unknown> | undefined;
+      // Support new args.properties format
+      if (argsDef) {
+        const props = argsDef['properties'] as Record<string, unknown> | undefined;
+        if (props && Object.keys(props).length > 0) {
+          names[funcName] = Object.keys(props);
+          continue;
+        }
+      }
+      // Fallback: support legacy parameters.items[] format
       const params = funcDef['parameters'] as Record<string, unknown> | undefined;
       if (!params) continue;
       const items = params['items'];
