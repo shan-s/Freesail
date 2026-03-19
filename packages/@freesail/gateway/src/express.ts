@@ -108,8 +108,8 @@ export function createExpressServer(options: ExpressServerOptions): Express {
 
       const agentId = sessionManager.getAgentForSession(sessionId);
       if (agentId) {
-        // Inject synthetic __session_disconnected event for the claiming agent
-        // so it can observe the disconnect even though the session is removed
+        // Store a disconnect notification so the claiming agent can observe the
+        // browser session going offline even after the session has been removed.
         const disconnectEvent = {
           version: 'v0.9' as const,
           action: {
@@ -120,7 +120,7 @@ export function createExpressServer(options: ExpressServerOptions): Express {
             context: { sessionId },
           },
         };
-        sessionManager.enqueueOfflineAction(agentId, sessionId, disconnectEvent as any);
+        sessionManager.enqueueDisconnectNotification(agentId, sessionId, disconnectEvent as any);
       }
 
       sessionManager.removeSession(sessionId);

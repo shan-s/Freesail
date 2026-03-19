@@ -535,9 +535,10 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
           .map(sid => ({ sessionId: sid, actions: sessionManager.dequeueActions(sid) }))
           .filter(a => a.actions.length > 0);
           
-        const offlineActions = sessionManager.dequeueOfflineActions(agentId);
-        if (offlineActions.length > 0) {
-          allActions.push(...offlineActions);
+        // Drain any disconnect notifications for browser sessions that went offline
+        const disconnectNotifications = sessionManager.drainDisconnectNotifications(agentId);
+        if (disconnectNotifications.length > 0) {
+          allActions.push(...disconnectNotifications);
         }
       } else {
         allActions = sessionManager.dequeueAllActions();
@@ -743,8 +744,18 @@ export async function runMCPServerHTTP(options: MCPHTTPServerOptions): Promise<v
       transport.onclose = () => {
         const sid = transport.sessionId;
         if (sid) {
-          logger.info(`[MCP-HTTP] Transport closed for session ${sid}`);
+          logger.info(`[MCP-HTTP] Agent transport closed: ${sid}`);
           delete transports[sid];
+
+          // Close all browser sessions owned by this agent
+          const claimedSessions = options.sessionManager.getSessionsForAgent(sid);
+          for (const browserSessionId of claimedSessions) {
+            logger.info(`[MCP-HTTP] Closing browser session ${browserSessionId} — agent ${sid} disconnected`);
+            options.sessionManager.removeSession(browserSessionId);
+          }
+
+          // Discard pending disconnect notifications — agent is gone and cannot collect them
+          options.sessionManager.clearDisconnectNotifications(sid);
         }
       };
 

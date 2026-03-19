@@ -105,7 +105,9 @@ export class SessionManager {
   private agentBindings: Map<string, AgentBinding> = new Map();
   private sessionToAgent: Map<string, string> = new Map();
   private sessionEventListeners: Map<keyof SessionManagerEvents, Array<(...args: any[]) => void>> = new Map();
-  private offlineAgentActions: Map<string, Array<{ sessionId: string, actions: UpstreamMessage[] }>> = new Map();
+  /** Disconnect notifications for browser sessions that have gone offline, keyed by the claiming agent ID.
+   *  Held until the agent collects them via drainDisconnectNotifications. */
+  private disconnectNotifications: Map<string, Array<{ sessionId: string, actions: UpstreamMessage[] }>> = new Map();
   private pendingDataModelRequests: Map<string, { resolve: (data: Record<string, unknown>) => void; timer: ReturnType<typeof setTimeout> }> = new Map();
   private options: Required<SessionManagerOptions>;
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
@@ -404,36 +406,45 @@ export class SessionManager {
   private static readonly MAX_OFFLINE_ACTIONS_PER_SESSION = 100;
 
   /**
-   * Enqueue an action for an agent whose session has disconnected.
+   * Store a disconnect notification for a browser session that has gone offline.
+   * Held under the claiming agent's ID until the agent drains them.
    */
-  enqueueOfflineAction(agentId: string, sessionId: string, message: UpstreamMessage): void {
-    let queues = this.offlineAgentActions.get(agentId);
+  enqueueDisconnectNotification(agentId: string, sessionId: string, message: UpstreamMessage): void {
+    let queues = this.disconnectNotifications.get(agentId);
     if (!queues) {
       queues = [];
-      this.offlineAgentActions.set(agentId, queues);
+      this.disconnectNotifications.set(agentId, queues);
     }
 
     // Check if we already have an entry for this session
-    let sessionQueue = queues.find(q => q.sessionId === sessionId);
+    let sessionQueue = queues.find((q: { sessionId: string; actions: UpstreamMessage[] }) => q.sessionId === sessionId);
     if (!sessionQueue) {
       sessionQueue = { sessionId, actions: [] };
       queues.push(sessionQueue);
     }
     if (sessionQueue.actions.length >= SessionManager.MAX_OFFLINE_ACTIONS_PER_SESSION) {
-      logger.warn(`[SessionManager] Offline queue full for agent ${agentId} session ${sessionId}, dropping oldest action`);
+      logger.warn(`[SessionManager] Disconnect notification queue full for agent ${agentId} session ${sessionId}, dropping oldest`);
       sessionQueue.actions.shift();
     }
     sessionQueue.actions.push(message);
   }
 
   /**
-   * Dequeue all offline actions for an agent.
+   * Drain all pending disconnect notifications for an agent and return them.
    */
-  dequeueOfflineActions(agentId: string): Array<{ sessionId: string; actions: UpstreamMessage[] }> {
-    const queues = this.offlineAgentActions.get(agentId);
+  drainDisconnectNotifications(agentId: string): Array<{ sessionId: string; actions: UpstreamMessage[] }> {
+    const queues = this.disconnectNotifications.get(agentId);
     if (!queues || queues.length === 0) return [];
-    this.offlineAgentActions.delete(agentId);
+    this.disconnectNotifications.delete(agentId);
     return queues;
+  }
+
+  /**
+   * Discard all pending disconnect notifications for an agent.
+   * Called when the agent itself disconnects and can no longer collect them.
+   */
+  clearDisconnectNotifications(agentId: string): void {
+    this.disconnectNotifications.delete(agentId);
   }
 
   /**
@@ -763,7 +774,7 @@ export class SessionManager {
     this.surfaceToSession.clear();
     this.surfaceToCatalog.clear();
     this.actionQueue.clear();
-    this.offlineAgentActions.clear();
+    this.disconnectNotifications.clear();
     this.agentBindings.clear();
     this.sessionToAgent.clear();
     for (const pending of this.pendingDataModelRequests.values()) {
