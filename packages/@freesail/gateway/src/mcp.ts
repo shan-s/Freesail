@@ -106,6 +106,16 @@ try {
 }
 
 /**
+ * Derive the agent ID from the MCP transport session.
+ * In HTTP mode, extra.sessionId is the UUID assigned by StreamableHTTPServerTransport
+ * at the initialize handshake. In stdio mode it is undefined, so we fall back to
+ * the fixed string "local-agent".
+ */
+function getAgentId(extra: { sessionId?: string }): string {
+  return extra.sessionId ?? 'local-agent';
+}
+
+/**
  * Creates the MCP server with Freesail tools.
  */
 export function createMCPServer(options: MCPServerOptions): McpServer {
@@ -515,34 +525,28 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
     }
   );
 
-  // Tool to drain all pending actions across all sessions
+  // Tool to drain all pending actions for the calling agent's sessions
   server.registerTool(
     'get_all_pending_actions',
     {
       description:
-        'Retrieve and drain all pending upstream actions from ALL connected sessions ' +
-        '(or only sessions claimed by a specific agent). ' +
+        'Retrieve and drain all pending upstream actions from all sessions claimed by this agent. ' +
         'Returns an array of { sessionId, actions } objects. Only sessions with pending actions are included.',
-      inputSchema: {
-        agentId: z.string().optional().describe('If provided, only return actions from sessions claimed by this agent'),
-      },
+      inputSchema: {},
     },
-    async ({ agentId }) => {
-      let allActions: Array<{ sessionId: string, actions: any[] }>;
-      if (agentId) {
-        const sessionIds = sessionManager.getSessionsForAgent(agentId);
-        allActions = sessionIds
-          .map(sid => ({ sessionId: sid, actions: sessionManager.dequeueActions(sid) }))
-          .filter(a => a.actions.length > 0);
-          
-        // Drain any disconnect notifications for browser sessions that went offline
-        const disconnectNotifications = sessionManager.drainDisconnectNotifications(agentId);
-        if (disconnectNotifications.length > 0) {
-          allActions.push(...disconnectNotifications);
-        }
-      } else {
-        allActions = sessionManager.dequeueAllActions();
+    async (_params, extra) => {
+      const agentId = getAgentId(extra);
+      const sessionIds = sessionManager.getSessionsForAgent(agentId);
+      const allActions: Array<{ sessionId: string, actions: any[] }> = sessionIds
+        .map(sid => ({ sessionId: sid, actions: sessionManager.dequeueActions(sid) }))
+        .filter(a => a.actions.length > 0);
+
+      // Drain any disconnect notifications for browser sessions that went offline
+      const disconnectNotifications = sessionManager.drainDisconnectNotifications(agentId);
+      if (disconnectNotifications.length > 0) {
+        allActions.push(...disconnectNotifications);
       }
+
       return {
         content: [
           {
@@ -563,11 +567,10 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
       description:
         'List the client sessions owned by this agent, with their surfaces, ' +
         'supported catalogs, and pending action counts.',
-      inputSchema: {
-        agentId: z.string().describe('Your agent identifier'),
-      },
+      inputSchema: {},
     },
-    async ({ agentId }) => {
+    async (_params, extra) => {
+      const agentId = getAgentId(extra);
       const ownedSessionIds = new Set(sessionManager.getSessionsForAgent(agentId));
       const summaries = sessionManager.getSessionSummaries()
         .filter(s => ownedSessionIds.has(s.id));
@@ -636,15 +639,15 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
     'claim_session',
     {
       description:
-        'Claim a client session for this agent. Once claimed, you can filter ' +
-        'get_all_pending_actions by your agentId to receive only your sessions\' actions. ' +
+        'Claim a client session for this agent. Once claimed, get_all_pending_actions ' +
+        'will return actions only from your claimed sessions. ' +
         'A session can only be claimed by one agent at a time.',
       inputSchema: {
-        agentId: z.string().describe('Your unique agent identifier'),
         sessionId: z.string().describe('The client session ID to claim'),
       },
     },
-    async ({ agentId, sessionId }) => {
+    async ({ sessionId }, extra) => {
+      const agentId = getAgentId(extra);
       const result = sessionManager.claimSession(agentId, sessionId);
       return {
         content: [{ type: 'text', text: JSON.stringify(result) }],
@@ -658,11 +661,11 @@ export function createMCPServer(options: MCPServerOptions): McpServer {
     {
       description: 'Release your claim on a client session, making it available to other agents.',
       inputSchema: {
-        agentId: z.string().describe('Your agent identifier'),
         sessionId: z.string().describe('The session to release'),
       },
     },
-    async ({ agentId, sessionId }) => {
+    async ({ sessionId }, extra) => {
+      const agentId = getAgentId(extra);
       const released = sessionManager.releaseSession(agentId, sessionId);
       return {
         content: [{
