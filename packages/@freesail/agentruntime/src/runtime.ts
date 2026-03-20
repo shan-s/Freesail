@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { ResourceUpdatedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "@freesail/logger";
-import { FreesailAgent, AgentFactory, ActionEvent } from "./types.js";
+import { FreesailAgent, AgentFactory, ActionEvent, ClientErrorEvent } from "./types.js";
 
 const SESSIONS_URI = "mcp://freesail.dev/sessions";
 
@@ -169,6 +169,20 @@ export class FreesailAgentRuntime {
     p.finally(() => pending.delete(p));
   }
 
+  private dispatchError(sessionId: string, agent: FreesailAgent, errorEvent: ClientErrorEvent): void {
+    if (!this.inFlightActions.has(sessionId)) {
+      this.inFlightActions.set(sessionId, new Set());
+    }
+    const pending = this.inFlightActions.get(sessionId)!;
+
+    const p = (agent.onClientError?.(errorEvent) ?? Promise.resolve()).catch((err) =>
+      logger.error(`[AgentRuntime] onClientError failed (session=${sessionId}):`, err)
+    );
+
+    pending.add(p);
+    p.finally(() => pending.delete(p));
+  }
+
   /**
    * Wait for all in-flight actions for a session to complete.
    * Called from the disconnect path before removing the agent.
@@ -302,12 +316,18 @@ export class FreesailAgentRuntime {
       const content = result.contents[0];
       if (!content || !("text" in content) || !content.text) return;
 
-      const actions = JSON.parse(content.text) as Array<{
+      const messages = JSON.parse(content.text) as Array<{
         action?: {
           name: string;
           surfaceId: string;
           sourceComponentId: string;
           context: Record<string, unknown>;
+        };
+        error?: {
+          code: string;
+          message: string;
+          surfaceId: string;
+          path?: string;
         };
         dataModel?: {
           surfaceId: string;
@@ -315,10 +335,24 @@ export class FreesailAgentRuntime {
         };
       }>;
 
-      if (!Array.isArray(actions) || actions.length === 0) return;
+      if (!Array.isArray(messages) || messages.length === 0) return;
 
-      for (const actionMsg of actions) {
-        const rawAction = actionMsg.action;
+      for (const msg of messages) {
+        const agent = this.activeAgents.get(sessionId);
+        if (!agent) continue;
+
+        if (msg.error) {
+          const errorEvent: ClientErrorEvent = {
+            code: msg.error.code,
+            message: msg.error.message,
+            surfaceId: msg.error.surfaceId,
+            path: msg.error.path,
+          };
+          this.dispatchError(sessionId, agent, errorEvent);
+          continue;
+        }
+
+        const rawAction = msg.action;
         if (!rawAction) continue;
 
         // Skip internal lifecycle events — handled via sessions list subscription
@@ -328,16 +362,12 @@ export class FreesailAgentRuntime {
           `[AgentRuntime] Routing Action: ${rawAction.name} (session=${sessionId})`,
         );
 
-        // Only process actions for sessions we own
-        const agent = this.activeAgents.get(sessionId);
-        if (!agent) continue;
-
         const actionEvent: ActionEvent = {
           name: rawAction.name,
           surfaceId: rawAction.surfaceId,
           sourceComponentId: rawAction.sourceComponentId,
           context: rawAction.context,
-          clientDataModel: actionMsg.dataModel?.dataModel,
+          clientDataModel: msg.dataModel?.dataModel,
         };
 
         // Fire-and-forget, but tracked so disconnect can drain in-flight calls

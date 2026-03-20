@@ -15,6 +15,13 @@ export interface ActionEvent {
   clientDataModel?: Record<string, unknown>;
 }
 
+export interface ClientErrorEvent {
+  code: string;
+  message: string;
+  surfaceId: string;
+  path?: string;
+}
+
 export interface FreesailAgent {
   /**
    * Called when a new session is established.
@@ -40,6 +47,12 @@ export interface FreesailAgent {
    * The agent already knows its session from the factory; sessionId is not repeated here.
    */
   onAction?(action: ActionEvent): Promise<void>;
+
+  /**
+   * Called when the frontend reports a client-side error (validation failure, runtime error, etc.).
+   * The agent already knows its session from the factory; sessionId is not repeated here.
+   */
+  onClientError?(error: ClientErrorEvent): Promise<void>;
 }
 
 /**
