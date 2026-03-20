@@ -182,7 +182,7 @@ export function FreesailProvider({
         {
           surfaceId,
           componentIds,
-          message: `These components in surface '${String(surfaceId)}' are not reachable from root and won't render: ${componentIds.join(', ')}. Did you forget to wire them to a parent component? If so, update the parent to include them. Alternatively, call delete_surface and recreate UI with the correct tree.`,
+          message: `These components in surface '${String(surfaceId)}' are not reachable from root and won't render: ${componentIds.join(', ')}. Did you forget to wire them to a parent component? Please update the parent to include them, or ignore if this was intentional.`,
         }
       );
     });
