@@ -105,6 +105,101 @@ function discoverCatalogs(): CatalogConfig[] {
   return [];
 }
 
+// ---------------------------------------------------------------------------
+// $ref validation helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Recursively collect all $ref values from a JSON structure, recording the
+ * JSON-Pointer-style path to each occurrence.
+ */
+function collectRefs(
+  node: unknown,
+  path: string,
+  results: Array<{ ref: string; path: string }>
+): void {
+  if (node === null || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    node.forEach((item, i) => collectRefs(item, `${path}/${i}`, results));
+    return;
+  }
+  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    if (key === '$ref' && typeof value === 'string') {
+      results.push({ ref: value, path: path || '/' });
+    }
+    collectRefs(value, path ? `${path}/${key}` : key, results);
+  }
+}
+
+/**
+ * Resolve a JSON Pointer fragment (the part after `#`) against the catalog root.
+ * Returns true if the target node exists, false otherwise.
+ * Implements RFC 6901 token unescaping (~1 → /, ~0 → ~).
+ */
+function resolveJsonPointer(catalog: Record<string, unknown>, pointer: string): boolean {
+  if (pointer === '' || pointer === '/') return true;
+  const tokens = pointer.replace(/^\//, '').split('/').map(t => t.replace(/~1/g, '/').replace(/~0/g, '~'));
+  let node: unknown = catalog;
+  for (const token of tokens) {
+    if (node === null || typeof node !== 'object') return false;
+    node = (node as Record<string, unknown>)[token];
+    if (node === undefined) return false;
+  }
+  return true;
+}
+
+/**
+ * Walk all $refs in the catalog, resolve internal ones, warn on external ones.
+ * Returns true if no broken refs were found.
+ */
+function validateRefs(catalog: Record<string, unknown>): boolean {
+  const found: Array<{ ref: string; path: string }> = [];
+  collectRefs(catalog, '', found);
+
+  if (found.length === 0) {
+    console.log(`   ✅ $ref check: no $refs found.`);
+    return true;
+  }
+
+  const broken: Array<{ ref: string; path: string }> = [];
+  const warnings: Array<{ ref: string; path: string }> = [];
+  let validCount = 0;
+
+  for (const { ref, path } of found) {
+    if (ref.startsWith('#')) {
+      if (resolveJsonPointer(catalog, ref.slice(1))) {
+        validCount++;
+      } else {
+        broken.push({ ref, path });
+      }
+    } else {
+      warnings.push({ ref, path });
+      validCount++;
+    }
+  }
+
+  for (const { ref, path } of warnings) {
+    console.warn(`   ⚠  External $ref not inlined: "${ref}" at ${path}`);
+    console.warn(`      Run 'freesail prepare catalog' to inline external refs.`);
+  }
+  for (const { ref, path } of broken) {
+    console.error(`   ❌ Broken $ref: "${ref}" at ${path} — target not found in catalog`);
+  }
+
+  if (broken.length > 0) {
+    console.error(`   ❌ $ref check: ${validCount} valid, ${broken.length} broken (${found.length} total)`);
+    return false;
+  }
+  if (warnings.length > 0) {
+    console.log(`   ✅ $ref check: ${validCount} valid, ${warnings.length} external warning(s) (${found.length} total)`);
+  } else {
+    console.log(`   ✅ $ref check: all ${validCount} refs resolve correctly`);
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+
 /**
  * Extract exported names from a TypeScript source file using a simple regex.
  * Matches: export function Foo, export const Foo, export class Foo, export { Foo }
@@ -224,6 +319,15 @@ function validateCatalog(config: CatalogConfig): boolean {
     }
   } catch (err) {
     console.error(`   ⚠  Error during strict schema validation setup:`, err);
+  }
+
+  // 2.5 $ref resolution check
+  try {
+    if (!validateRefs(schema)) {
+      isOk = false;
+    }
+  } catch (err) {
+    console.warn(`   ⚠  Error during $ref check:`, err);
   }
 
   const catalogId = schema['catalogId'] ?? schema['$id'] ?? schema['id'];

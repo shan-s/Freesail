@@ -9,7 +9,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -22,11 +22,11 @@
               "const": "WeatherCard"
             },
             "location": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "City or location name (e.g. 'London', 'New York'). Extract this from the user's request."
             },
             "temperature": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Current temperature value"
             },
             "unit": {
@@ -53,11 +53,11 @@
               ]
             },
             "humidity": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Humidity percentage (0-100)"
             },
             "windSpeed": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Wind speed value"
             },
             "windUnit": {
@@ -71,11 +71,11 @@
               "default": "km/h"
             },
             "feelsLike": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Feels-like temperature"
             },
             "background": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Background color override",
               "default": "bgSurface"
             }
@@ -94,7 +94,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -107,15 +107,15 @@
               "const": "ForecastRow"
             },
             "day": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Day label (e.g. 'Mon', 'Tuesday', 'Today')"
             },
             "high": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "High temperature"
             },
             "low": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Low temperature"
             },
             "unit": {
@@ -142,7 +142,7 @@
               ]
             },
             "precipitation": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Precipitation chance percentage (0-100)"
             }
           },
@@ -161,7 +161,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -174,12 +174,12 @@
               "const": "ForecastPanel"
             },
             "title": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Panel title (e.g. '5-Day Forecast')",
               "default": "Forecast"
             },
             "children": {
-              "$ref": "./common/common_types.json#/$defs/ChildList",
+              "$ref": "#/$defs/ChildList",
               "description": "Defines the children. Use an array of strings for a fixed set of children, or a template object to generate children from a data list."
             }
           },
@@ -195,7 +195,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -208,7 +208,7 @@
               "const": "TemperatureDisplay"
             },
             "value": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Temperature value"
             },
             "unit": {
@@ -232,7 +232,7 @@
               "default": "lg"
             },
             "color": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Text color"
             }
           },
@@ -248,7 +248,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -286,7 +286,7 @@
               "default": "md"
             },
             "animated": {
-              "$ref": "./common/common_types.json#/$defs/DynamicBoolean",
+              "$ref": "#/$defs/DynamicBoolean",
               "description": "Whether to use subtle animation",
               "default": false
             }
@@ -303,7 +303,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -316,7 +316,7 @@
               "const": "WindIndicator"
             },
             "speed": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Wind speed value"
             },
             "unit": {
@@ -344,7 +344,7 @@
               ]
             },
             "gustSpeed": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Gust speed value"
             }
           },
@@ -360,7 +360,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -373,11 +373,11 @@
               "const": "HumidityGauge"
             },
             "value": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "Humidity percentage (0-100)"
             },
             "label": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Label text",
               "default": "Humidity"
             }
@@ -394,7 +394,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -407,11 +407,11 @@
               "const": "UVIndex"
             },
             "value": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "UV index value (0-11+)"
             },
             "label": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Label text",
               "default": "UV Index"
             }
@@ -428,7 +428,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -451,15 +451,15 @@
               ]
             },
             "title": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Alert title"
             },
             "message": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Alert description text"
             },
             "expires": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Expiry time (human-readable or ISO 8601)"
             }
           },
@@ -476,7 +476,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -489,15 +489,15 @@
               "const": "SunriseSunset"
             },
             "sunrise": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Sunrise time (e.g. '6:32 AM')"
             },
             "sunset": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Sunset time (e.g. '7:15 PM')"
             },
             "currentTime": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Current time for positioning the sun indicator"
             }
           },
@@ -514,7 +514,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -527,16 +527,16 @@
               "const": "AirQuality"
             },
             "value": {
-              "$ref": "./common/common_types.json#/$defs/DynamicNumber",
+              "$ref": "#/$defs/DynamicNumber",
               "description": "AQI value (0-500)"
             },
             "label": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Label text",
               "default": "Air Quality"
             },
             "pollutant": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Primary pollutant (e.g. 'PM2.5', 'O3')"
             }
           },
@@ -552,7 +552,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -566,16 +566,16 @@
             },
             "children": {
               "description": "Defines the children. Use an array of strings for a fixed set of children, or a template object to generate children from a data list. Children cannot be defined inline, they must be referred to by ID.",
-              "$ref": "./common/common_types.json#/$defs/ChildList"
+              "$ref": "#/$defs/ChildList"
             },
             "gap": {
               "description": "The spacing between children.",
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "default": "8px"
             },
             "padding": {
               "description": "Padding around the content.",
-              "$ref": "./common/common_types.json#/$defs/DynamicString"
+              "$ref": "#/$defs/DynamicString"
             },
             "justify": {
               "type": "string",
@@ -613,7 +613,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -627,16 +627,16 @@
             },
             "children": {
               "description": "Defines the children. Use an array of strings for a fixed set of children, or a template object to generate children from a data list. Children cannot be defined inline, they must be referred to by ID.",
-              "$ref": "./common/common_types.json#/$defs/ChildList"
+              "$ref": "#/$defs/ChildList"
             },
             "gap": {
               "description": "The spacing between children.",
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "default": "8px"
             },
             "padding": {
               "description": "Padding around the content.",
-              "$ref": "./common/common_types.json#/$defs/DynamicString"
+              "$ref": "#/$defs/DynamicString"
             },
             "justify": {
               "type": "string",
@@ -674,7 +674,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -688,23 +688,23 @@
             },
             "padding": {
               "description": "Padding inside the card.",
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "default": "16px"
             },
             "width": {
               "description": "The width of the card.",
-              "$ref": "./common/common_types.json#/$defs/DynamicString"
+              "$ref": "#/$defs/DynamicString"
             },
             "height": {
               "description": "The height of the card.",
-              "$ref": "./common/common_types.json#/$defs/DynamicString"
+              "$ref": "#/$defs/DynamicString"
             },
             "background": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "A CSS color value for the card's background fill. Accepts any valid CSS color, e.g. hex ('#22c55e'), named ('red'), rgb/rgba, hsl. Defaults to the theme surface color."
             },
             "child": {
-              "$ref": "./common/common_types.json#/$defs/ComponentId",
+              "$ref": "#/$defs/ComponentId",
               "description": "The ID of the single child component to be rendered inside the card. To display multiple elements, you MUST wrap them in a layout component (like Column or Row) and pass that container's ID here. Do NOT pass multiple IDs or a non-existent ID. Do NOT define the child component inline."
             }
           },
@@ -720,7 +720,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "./common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -735,10 +735,10 @@
             "width": {
               "oneOf": [
                 {
-                  "$ref": "./common/common_types.json#/$defs/DynamicString"
+                  "$ref": "#/$defs/DynamicString"
                 },
                 {
-                  "$ref": "./common/common_types.json#/$defs/DynamicNumber"
+                  "$ref": "#/$defs/DynamicNumber"
                 }
               ],
               "description": "The width of the spacer. If a number is provided, it is treated as pixels. Defaults to '16px'.",
@@ -747,10 +747,10 @@
             "height": {
               "oneOf": [
                 {
-                  "$ref": "./common/common_types.json#/$defs/DynamicString"
+                  "$ref": "#/$defs/DynamicString"
                 },
                 {
-                  "$ref": "./common/common_types.json#/$defs/DynamicNumber"
+                  "$ref": "#/$defs/DynamicNumber"
                 }
               ],
               "description": "The height of the spacer. If a number is provided, it is treated as pixels. Defaults to '16px'.",
@@ -785,7 +785,7 @@
             "value"
           ],
           "additionalProperties": {
-            "$ref": "./common/common_types.json#/$defs/DynamicValue"
+            "$ref": "#/$defs/DynamicValue"
           }
         },
         "returnType": {
@@ -809,11 +809,11 @@
           "type": "object",
           "properties": {
             "value": {
-              "$ref": "./common/common_types.json#/$defs/DynamicValue",
+              "$ref": "#/$defs/DynamicValue",
               "description": "The date to format."
             },
             "pattern": {
-              "$ref": "./common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "A Unicode TR35 date pattern string.\n\nToken Reference:\n- Year: 'yy' (26), 'yyyy' (2026)\n- Month: 'M' (1), 'MM' (01), 'MMM' (Jan), 'MMMM' (January)\n- Day: 'd' (1), 'dd' (01), 'E' (Tue), 'EEEE' (Tuesday)\n- Hour (12h): 'h' (1-12), 'hh' (01-12) - requires 'a' for AM/PM\n- Hour (24h): 'H' (0-23), 'HH' (00-23) - Military Time\n- Minute: 'mm' (00-59)\n- Second: 'ss' (00-59)\n- Period: 'a' (AM/PM)\n\nExamples:\n- 'MMM dd, yyyy' -> 'Jan 16, 2026'\n- 'HH:mm' -> '14:30' (Military)\n- 'h:mm a' -> '2:30 PM'\n- 'EEEE, d MMMM' -> 'Friday, 16 January'"
             }
           },
@@ -1191,7 +1191,7 @@
       ],
       "oneOf": [
         {
-          "$ref": "catalog.json#/$defs/anyFunction"
+          "$ref": "#/$defs/anyFunction"
         }
       ]
     },

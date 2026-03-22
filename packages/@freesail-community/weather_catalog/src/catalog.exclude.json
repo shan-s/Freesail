@@ -19,7 +19,6 @@
     "formatCurrency",
     "pluralize",
     "openUrl",
-    "not",
     "and",
     "or",
     "isEmpty",

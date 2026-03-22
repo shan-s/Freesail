@@ -9,7 +9,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -27,11 +27,11 @@
               "default": "100%"
             },
             "title": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Optional header title displayed above the message area"
             },
             "children": {
-              "$ref": "../common/common_types.json#/$defs/ChildList",
+              "$ref": "#/$defs/ChildList",
               "description": "Defines the children."
             }
           },
@@ -47,7 +47,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -60,7 +60,7 @@
               "const": "ChatMessageList"
             },
             "children": {
-              "$ref": "../common/common_types.json#/$defs/ChildList",
+              "$ref": "#/$defs/ChildList",
               "description": "Scrollable container for chat messages. Auto-scrolls to bottom on new messages. Use ChildList template with path /messages."
             }
           },
@@ -76,7 +76,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -98,11 +98,11 @@
               ]
             },
             "content": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Message text content"
             },
             "timestamp": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "ISO 8601 timestamp of the message"
             }
           },
@@ -119,7 +119,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -132,12 +132,12 @@
               "const": "ChatInput"
             },
             "placeholder": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Placeholder text for the input field",
               "default": "Type a message..."
             },
             "disabled": {
-              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "$ref": "#/$defs/DynamicBoolean",
               "description": "Whether the input is disabled (e.g., while agent is processing)",
               "default": false
             }
@@ -153,7 +153,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -166,12 +166,12 @@
               "const": "ChatTypingIndicator"
             },
             "visible": {
-              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "$ref": "#/$defs/DynamicBoolean",
               "description": "Whether to show the typing indicator",
               "default": false
             },
             "text": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Optional label text",
               "default": "Thinking..."
             }
@@ -187,7 +187,7 @@
       "type": "object",
       "allOf": [
         {
-          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+          "$ref": "#/$defs/ComponentCommon"
         },
         {
           "$ref": "#/$defs/CatalogComponentCommon"
@@ -200,11 +200,11 @@
               "const": "AgentStream"
             },
             "token": {
-              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "$ref": "#/$defs/DynamicString",
               "description": "Latest token emitted by the agent. The component appends each new value to its internal buffer and renders the accumulated text."
             },
             "active": {
-              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "$ref": "#/$defs/DynamicBoolean",
               "description": "Whether the stream is currently active. When set to false the component freezes its buffer.",
               "default": false
             }
@@ -237,7 +237,7 @@
             "value"
           ],
           "additionalProperties": {
-            "$ref": "../common/common_types.json#/$defs/DynamicValue"
+            "$ref": "#/$defs/DynamicValue"
           }
         },
         "returnType": {
@@ -593,7 +593,7 @@
       ],
       "oneOf": [
         {
-          "$ref": "catalog.json#/$defs/anyFunction"
+          "$ref": "#/$defs/anyFunction"
         }
       ]
     },

@@ -96,19 +96,18 @@ function discoverCatalogs(): CatalogConfig[] {
 /**
  * Find the common/ directory relative to the catalog source path.
  * Probes: {srcPath}/common/ (standalone) then {srcPath}/../common/ (monorepo).
- * Returns the path and the $ref prefix to use in the output catalog.
  */
-function findCommonDir(srcPath: string): { dir: string; refPrefix: string } | null {
+function findCommonDir(srcPath: string): string | null {
   // Standalone: src/common/
   const standalone = path.join(srcPath, 'common');
   if (fs.existsSync(standalone)) {
-    return { dir: standalone, refPrefix: './common' };
+    return standalone;
   }
 
   // Monorepo: src/standard_catalog/../common/ → src/common/
   const monorepo = path.join(srcPath, '..', 'common');
   if (fs.existsSync(monorepo)) {
-    return { dir: monorepo, refPrefix: '../common' };
+    return monorepo;
   }
 
   return null;
@@ -120,20 +119,23 @@ function findCommonDir(srcPath: string): { dir: string; refPrefix: string } | nu
 
 /**
  * Recursively rewrite $ref values in a JSON structure.
- * Replaces `./common_types.json` with the correct relative path based on
- * where the common directory sits relative to the output catalog.
+ * Rewrites refs to common files (common_types.json, common_components.json)
+ * to internal $defs references, since those types are inlined into the output catalog.
+ * e.g. `./common_types.json#/$defs/Foo` → `#/$defs/Foo`
  */
-function rewriteRefs(obj: unknown, refPrefix: string): unknown {
+function rewriteRefs(obj: unknown): unknown {
   if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(item => rewriteRefs(item, refPrefix));
+  if (Array.isArray(obj)) return obj.map(item => rewriteRefs(item));
 
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     if (key === '$ref' && typeof value === 'string') {
-      // Rewrite ./common_types.json → {refPrefix}/common_types.json
-      result[key] = value.replace(/^\.\/common_types\.json/, `${refPrefix}/common_types.json`);
+      // Rewrite external file refs to internal refs (types are inlined in output):
+      //   ./common_types.json, ../common/common_types.json, ./common/common_types.json → #/...
+      //   catalog.json (self-reference) → #/...
+      result[key] = value.replace(/^(?:(?:\.\.\/common\/|\.\/common\/|\.\/)?common(?:_types|_components)|catalog)\.json(#.*)$/, '$1');
     } else {
-      result[key] = rewriteRefs(value, refPrefix);
+      result[key] = rewriteRefs(value);
     }
   }
   return result;
@@ -244,11 +246,11 @@ export function prepareCatalog(config: CatalogConfig): boolean {
   let rewrittenFunctions: Record<string, unknown> = {};
   let rewrittenDefs: Record<string, unknown> = {};
 
-  const common = findCommonDir(config.srcPath);
-  if (common) {
-    const commonComponentsJson = readJsonSafe(path.join(common.dir, 'common_components.json'));
-    const commonFunctionsJson = readJsonSafe(path.join(common.dir, 'common_functions.json'));
-    const commonTypesJson = readJsonSafe(path.join(common.dir, 'common_types.json'));
+  const commonDir = findCommonDir(config.srcPath);
+  if (commonDir) {
+    const commonComponentsJson = readJsonSafe(path.join(commonDir, 'common_components.json'));
+    const commonFunctionsJson = readJsonSafe(path.join(commonDir, 'common_functions.json'));
+    const commonTypesJson = readJsonSafe(path.join(commonDir, 'common_types.json'));
 
     const commonComponents = (commonComponentsJson?.['components'] ?? {}) as Record<string, unknown>;
     const commonFunctions = (commonFunctionsJson?.['functions'] ?? {}) as Record<string, unknown>;
@@ -258,18 +260,18 @@ export function prepareCatalog(config: CatalogConfig): boolean {
     // Merge: common_types.$defs first (lowest precedence), then common_components.$defs
     const commonDefs: Record<string, unknown> = { ...commonTypeDefs, ...commonComponentDefs };
 
-    rewrittenComponents = rewriteRefs(commonComponents, common.refPrefix) as Record<string, unknown>;
-    rewrittenFunctions = rewriteRefs(commonFunctions, common.refPrefix) as Record<string, unknown>;
-    rewrittenDefs = rewriteRefs(commonDefs, common.refPrefix) as Record<string, unknown>;
+    rewrittenComponents = rewriteRefs(commonComponents) as Record<string, unknown>;
+    rewrittenFunctions = rewriteRefs(commonFunctions) as Record<string, unknown>;
+    rewrittenDefs = rewriteRefs(commonDefs) as Record<string, unknown>;
   }
 
   // 3. Read custom schemas (optional)
   const customComponentsJson = readJsonSafe(path.join(config.srcPath, 'components.json'));
   const customFunctionsJson = readJsonSafe(path.join(config.srcPath, 'functions.json'));
 
-  const customComponents = (customComponentsJson?.['components'] ?? {}) as Record<string, unknown>;
-  const customFunctions = (customFunctionsJson?.['functions'] ?? {}) as Record<string, unknown>;
-  const customDefs = (customComponentsJson?.['$defs'] ?? {}) as Record<string, unknown>;
+  const customComponents = rewriteRefs((customComponentsJson?.['components'] ?? {})) as Record<string, unknown>;
+  const customFunctions = rewriteRefs((customFunctionsJson?.['functions'] ?? {})) as Record<string, unknown>;
+  const customDefs = rewriteRefs((customComponentsJson?.['$defs'] ?? {})) as Record<string, unknown>;
 
   // 4. Determine $schema path (try to find catalog-schema.json under src/schemas/)
   let schemaPath: string | undefined;
