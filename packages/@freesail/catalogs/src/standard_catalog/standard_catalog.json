@@ -1958,34 +1958,6 @@
       ],
       "unevaluatedProperties": false
     },
-    "not": {
-      "type": "object",
-      "description": "Returns the logical negation of the value.",
-      "properties": {
-        "call": {
-          "const": "not"
-        },
-        "args": {
-          "type": "object",
-          "properties": {
-            "value": {
-              "$ref": "../common/common_types.json#/$defs/DynamicValue"
-            }
-          },
-          "required": [
-            "value"
-          ]
-        },
-        "returnType": {
-          "const": "boolean"
-        }
-      },
-      "required": [
-        "call",
-        "args"
-      ],
-      "unevaluatedProperties": false
-    },
     "and": {
       "type": "object",
       "description": "Returns true if all arguments are truthy.",
