@@ -705,7 +705,7 @@ export function createMCPServer(options: MCPServerOptions): { server: McpServer;
     {
       description:
         'Get a summary of catalogs supported by a specific client session. ' +
-        'Returns an array of { catalogId, title, content } objects where content lists component and function names with brief descriptions. ' +
+        'Returns an array of { catalogId, title, content } objects where content lists component names, function names, and all shared type definitions. ' +
         'Use the catalogId when calling create_surface. ' +
         'Call get_component_details or get_function_details to get full property details before building a surface.',
       inputSchema: {
@@ -749,7 +749,8 @@ export function createMCPServer(options: MCPServerOptions): { server: McpServer;
     {
       description:
         'Get full property details for one or more components from a catalog. ' +
-        'Call this before using any component in update_components to understand its required and optional properties.',
+        'Call this before using any component in update_components to understand its required and optional properties. ' +
+        'Type definitions are available via get_catalogs.',
       inputSchema: {
         sessionId: z.string().describe('The client session ID'),
         catalogId: z.string().describe('The catalog ID to look up components in'),

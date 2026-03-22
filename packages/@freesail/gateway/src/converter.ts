@@ -747,6 +747,16 @@ export function generateCatalogIndex(catalog: Catalog): string {
     lines.push('');
   }
 
+  const defs = (catalog.$defs as Record<string, unknown>) ?? {};
+  if (Object.keys(defs).length > 0) {
+    lines.push('### Types');
+    lines.push('Shared types used in component and function properties.');
+    lines.push('');
+    for (const [name, schema] of Object.entries(defs)) {
+      lines.push(renderTypeEntry(name, schema as CatalogProperty, defs));
+    }
+  }
+
   return lines.join('\n');
 }
 
@@ -763,7 +773,6 @@ const functionDetailCache = new Map<string, string>();
 export function generateComponentDetails(catalog: Catalog, componentNames: string[]): string {
   const lines: string[] = [];
   const unknown: string[] = [];
-  const allReferencedNames = new Set<string>();
 
   for (const name of componentNames) {
     const key = `${catalog.catalogId}:${name}`;
@@ -771,7 +780,6 @@ export function generateComponentDetails(catalog: Catalog, componentNames: strin
     const cachedRefs = componentRefsCache.get(key);
     if (cached && cachedRefs) {
       lines.push(cached);
-      cachedRefs.forEach(n => allReferencedNames.add(n));
     } else {
       const entry = Object.entries(catalog.components).find(([n]) => n === name);
       if (!entry) {
@@ -782,7 +790,6 @@ export function generateComponentDetails(catalog: Catalog, componentNames: strin
       const detail = renderComponentDetail(catalog, entry[0], entry[1], refs);
       componentDetailCache.set(key, detail);
       componentRefsCache.set(key, refs);
-      refs.forEach(n => allReferencedNames.add(n));
       lines.push(detail);
     }
   }
@@ -790,14 +797,6 @@ export function generateComponentDetails(catalog: Catalog, componentNames: strin
   if (unknown.length > 0) {
     const available = Object.keys(catalog.components).join(', ');
     lines.push(`Unknown component(s): ${unknown.join(', ')}. Available: ${available}`);
-  }
-
-  const defs = (catalog.$defs as Record<string, unknown>) ?? {};
-  if (allReferencedNames.size > 0) {
-    lines.push('Types:');
-    for (const name of allReferencedNames) {
-      if (name in defs) lines.push(renderTypeEntry(name, defs[name] as CatalogProperty, defs));
-    }
   }
 
   return lines.join('\n');

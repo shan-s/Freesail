@@ -167,8 +167,6 @@ export const pluralize: FunctionImplementation = (
 // Logical Functions
 // =============================================================================
 
-export const not: FunctionImplementation = (value: unknown) => !value;
-
 export const and: FunctionImplementation = (...args: unknown[]) => {
   return args.every((arg) => !!arg);
 };
@@ -260,7 +258,6 @@ export const commonFunctions: Record<string, FunctionImplementation> = {
   pluralize,
   now,
   openUrl,
-  not,
   and,
   or,
   isEmpty,
