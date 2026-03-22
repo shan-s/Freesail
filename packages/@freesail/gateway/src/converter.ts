@@ -6,59 +6,13 @@
  */
 
 /**
- * Bundled definitions from common_types.json and CatalogComponentCommon.
- * These are inlined so the gateway doesn't need to perform filesystem I/O
- * or take an extra package dependency to resolve $refs at prompt-generation time.
+ * Resolve a JSON $ref string to a schema object from the catalog's own $defs.
+ * The catalog JSON (produced by `freesail prepare catalog`) is the source of truth
+ * for all type definitions — no fallback constants are needed.
  *
- * Keep in sync with:
- *   packages/@freesail/catalogs/src/common/common_types.json
- *   packages/@freesail/catalogs/src/standard_catalog/standard_catalog.json#/$defs
- */
-const BUNDLED_DEFS: Record<string, Record<string, unknown>> = {
-  // ---- From common_types.json ------------------------------------------------
-  ComponentCommon: {
-    properties: {
-      // 'id' is already documented in the system prompt — skip to avoid noise
-      accessibility: {
-        type: 'object',
-        description: 'Accessibility attributes (label, description) for assistive technologies.',
-      },
-      visible: {
-        type: 'boolean',
-        description: 'Controls whether the component is rendered. Defaults to true.',
-        default: true,
-      },
-    },
-  },
-  Checkable: {
-    properties: {
-      checks: {
-        type: 'array',
-        description:
-          'A list of validation checks. Each check has a condition (DynamicBoolean) and a message. ' +
-          'If any condition evaluates to false the component shows the error or is disabled.',
-      },
-    },
-  },
-  // ---- From standard_catalog.json $defs -------------------------------------
-  CatalogComponentCommon: {
-    properties: {
-      weight: {
-        type: 'number',
-        description:
-          'Flex-grow weight of this component within a Row or Column container. ' +
-          'Only meaningful when the component is a direct child of a Row or Column.',
-      },
-    },
-  },
-};
-
-/**
- * Resolve a JSON $ref string to a schema object.
- *
- * Handles two patterns:
- *   - "#/$defs/Foo"           → looks up in catalogDefs, then BUNDLED_DEFS
- *   - "path/to/file.json#/$defs/Foo" → extracts "Foo" and looks up in BUNDLED_DEFS
+ * Handles both:
+ *   - "#/$defs/Foo"                    → internal ref, looks up in catalogDefs
+ *   - "path/to/file.json#/$defs/Foo"   → external ref, extracts "Foo" and looks up in catalogDefs
  *
  * @returns the resolved schema object, or null if it cannot be resolved.
  */
@@ -66,6 +20,8 @@ function resolveRef(
   ref: string,
   catalogDefs?: Record<string, unknown>
 ): Record<string, unknown> | null {
+  if (!catalogDefs) return null;
+
   const hash = ref.indexOf('#');
   if (hash === -1) return null;
 
@@ -74,18 +30,10 @@ function resolveRef(
 
   if (parts.length < 2 || parts[0] !== '$defs') return null;
   const defName = parts[1];
-  if (!defName) return null; // narrow string | undefined → string
+  if (!defName) return null;
 
-  // 1. Try the catalog's own $defs (for internal #/$defs/... refs)
-  if (catalogDefs && defName in catalogDefs) {
-    return catalogDefs[defName] as Record<string, unknown>;
-  }
-
-  // 2. Fall back to bundled common-type definitions
-  const bundled = BUNDLED_DEFS[defName];
-  if (bundled) return bundled;
-
-  return null;
+  const resolved = catalogDefs[defName];
+  return resolved ? (resolved as Record<string, unknown>) : null;
 }
 
 import { z } from 'zod';
@@ -146,10 +94,14 @@ export interface Catalog {
   $defs?: Record<string, unknown>;
   components: Record<string, CatalogComponent>;
   functions?: Record<string, {
+    type?: string;
     description?: string;
-    args?: Record<string, unknown>;
-    parameters?: Record<string, unknown>;
-    returnType?: string;
+    properties?: {
+      call?: { const: string };
+      args?: Record<string, unknown>;
+      returnType?: { const: string };
+    };
+    required?: string[];
   }>;
   /** Freesail SDK version the client catalog was built against. Used for future compatibility checks. */
   freesailSdkVersion?: string;
@@ -184,7 +136,7 @@ export function catalogToMCPTools(catalog: Catalog): MCPTool[] {
  * Converts a component definition to a JSON Schema.
  */
 function componentToSchema(
-  name: string,
+  _name: string,
   component: CatalogComponent,
   catalogDefs?: Record<string, unknown>
 ): MCPTool['inputSchema'] {
@@ -204,7 +156,7 @@ function componentToSchema(
         // Skip 'component' property as it is fixed
         if (propName === 'component') continue;
 
-        properties[propName] = propertyToSchema(prop);
+        properties[propName] = propertyToSchema(prop, catalogDefs);
         if (prop.required) {
           if (!required.includes(propName)) required.push(propName);
         }
@@ -264,81 +216,35 @@ function componentToSchema(
 
 /**
  * Converts a property definition to JSON Schema.
+ *
+ * Fully schema-driven: unrecognized $refs are resolved from `defs` (the catalog's $defs)
+ * recursively. No type names are hardcoded. The depth cap prevents infinite recursion.
  */
-function propertyToSchema(prop: CatalogProperty): Record<string, unknown> {
-  // Common schemas for data binding and function call forms
-  const bindingSchema = {
-    type: 'object',
-    properties: { path: { type: 'string' } },
-    required: ['path'],
-  };
-  // Function call {call: "name", ...} — resolved client-side, passes validation
-  const functionCallSchema = {
-    type: 'object',
-    required: ['call'],
-    properties: { call: { type: 'string' } },
-  };
-
+function propertyToSchema(prop: CatalogProperty, defs?: Record<string, unknown>, depth = 0): Record<string, unknown> {
   if (prop.$ref) {
-    const ref = prop.$ref;
-    const refBaseName = ref.split('/').pop() || '';
-    if (refBaseName === 'DynamicStringList') {
-      return {
-        anyOf: [{ type: 'array', items: { type: 'string' } }, bindingSchema, functionCallSchema],
-        description: prop.description,
-      };
+    const refBaseName = (prop.$ref.split('/').pop() || '') as string;
+    if (defs && refBaseName in defs && depth < 4) {
+      const resolved = propertyToSchema(defs[refBaseName] as CatalogProperty, defs, depth + 1);
+      return prop.description ? { ...resolved, description: prop.description } : resolved;
     }
-    if (refBaseName === 'DynamicString') {
-      return {
-        anyOf: [{ type: 'string' }, bindingSchema, functionCallSchema],
-        description: prop.description,
-      };
-    }
-    if (refBaseName === 'DynamicNumber') {
-      return {
-        anyOf: [{ type: 'number' }, bindingSchema, functionCallSchema],
-        description: prop.description,
-      };
-    }
-    if (refBaseName === 'DynamicBoolean') {
-      return {
-        anyOf: [{ type: 'boolean' }, bindingSchema, functionCallSchema],
-        description: prop.description,
-      };
-    }
-    if (refBaseName === 'ChildList') {
-      return {
-        anyOf: [
-          { type: 'array', items: { type: 'string' } },
-          {
-            type: 'object',
-            properties: { componentId: { type: 'string' }, path: { type: 'string' } },
-            required: ['componentId', 'path'],
-          },
-        ],
-        description: prop.description,
-      };
-    }
-    // Unresolved $ref (e.g. Action, DynamicValue, custom types) — accept any value
+    // Unresolved $ref — accept any value
     return prop.description ? { description: prop.description } : {};
   }
 
-  // Handle oneOf / anyOf / allOf by recursing into each branch
-  if (prop.oneOf) {
+  // Handle oneOf / anyOf — both become anyOf in validation schemas.
+  // Using anyOf (at-least-one) instead of oneOf (exactly-one) avoids false failures:
+  // when some branches resolve to {} at the depth cap, they match any value, which
+  // causes oneOf uniqueness checks to fail even for valid inputs.
+  if (prop.oneOf || prop.anyOf) {
+    const branches = (prop.oneOf ?? prop.anyOf)!;
     return {
-      oneOf: prop.oneOf.map(p => propertyToSchema(p)),
-      ...(prop.description ? { description: prop.description } : {}),
-    };
-  }
-  if (prop.anyOf) {
-    return {
-      anyOf: prop.anyOf.map(p => propertyToSchema(p)),
+      anyOf: branches.map(p => propertyToSchema(p, defs, depth + 1)),
       ...(prop.description ? { description: prop.description } : {}),
     };
   }
   if (prop.allOf) {
     return {
-      allOf: prop.allOf.map(p => propertyToSchema(p)),
+      allOf: prop.allOf.map(p => propertyToSchema(p, defs, depth + 1)),
       ...(prop.description ? { description: prop.description } : {}),
     };
   }
@@ -348,29 +254,20 @@ function propertyToSchema(prop: CatalogProperty): Record<string, unknown> {
     return prop.description ? { description: prop.description } : {};
   }
 
-  const schema: Record<string, unknown> = {
-    type: prop.type,
-  };
+  const schema: Record<string, unknown> = { type: prop.type };
 
-  if (prop.description) {
-    schema['description'] = prop.description;
-  }
+  if (prop.description) schema['description'] = prop.description;
 
   // NOTE: enum is intentionally NOT copied into the Ajv validation schema.
   // Enums are soft hints for the LLM (shown in the prompt via generateCatalogPrompt)
   // but not hard constraints — e.g. Material Symbols supports thousands of icon
   // names beyond the curated catalog list.
 
-  if (prop.default !== undefined) {
-    schema['default'] = prop.default;
-  }
-
-  if (prop.const !== undefined) {
-    schema['const'] = prop.const;
-  }
+  if (prop.default !== undefined) schema['default'] = prop.default;
+  if (prop.const !== undefined) schema['const'] = prop.const;
 
   if (prop.type === 'array' && prop.items) {
-    schema['items'] = propertyToSchema(prop.items);
+    schema['items'] = propertyToSchema(prop.items, defs, depth + 1);
   }
 
   // Preserve inner object structure for strict validation of known properties
@@ -378,16 +275,17 @@ function propertyToSchema(prop: CatalogProperty): Record<string, unknown> {
     if (prop.properties) {
       const innerProps: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(prop.properties)) {
-        innerProps[k] = propertyToSchema(v);
+        innerProps[k] = propertyToSchema(v, defs, depth + 1);
       }
       schema['properties'] = innerProps;
     }
     const rawProp = prop as Record<string, unknown>;
-    if (Array.isArray(rawProp['required'])) {
-      schema['required'] = rawProp['required'];
-    }
+    if (Array.isArray(rawProp['required'])) schema['required'] = rawProp['required'];
     if (prop.additionalProperties !== undefined) {
-      schema['additionalProperties'] = prop.additionalProperties;
+      const raw = (prop as Record<string, unknown>)['additionalProperties'];
+      schema['additionalProperties'] = typeof raw === 'boolean'
+        ? raw
+        : propertyToSchema(raw as CatalogProperty, defs, depth + 1);
     }
   }
 
@@ -399,93 +297,279 @@ function propertyToSchema(prop: CatalogProperty): Record<string, unknown> {
  */
 const catalogPromptCache = new WeakMap<Catalog, string>();
 
+// ---------------------------------------------------------------------------
+// Shallow type formatter + referenced-def helpers (for component detail output)
+// ---------------------------------------------------------------------------
+
 /**
- * Formats a catalog property type into a compact, TypeScript-like string.
- * @param prop The property schema
- * @param depth Current recursion depth (capped at 2)
+ * Formats a property type stopping at $ref boundaries — returns the def name instead of
+ * expanding it. Used for the property list in component details; the Types section then
+ * expands each referenced def once.
  */
-function formatPropertyType(prop: CatalogProperty, depth = 0): string {
-  if (depth > 2) return 'any';
+function formatPropertyTypeShallow(prop: CatalogProperty, defs?: Record<string, unknown>): string {
+  if (prop.const !== undefined) return JSON.stringify(prop.const);
 
-  // 1. $ref handling
-  if (prop.$ref) {
-    const base = prop.$ref.split('/').pop() || 'unknown';
-    if (base === 'DataBinding') return '{"path":"..."}';
-    if (base === 'ChildList') return 'string[] | ChildTemplate';
-    if (base === 'ComponentId') return 'ComponentId';
-    if (base === 'Action') return 'Action';
-    
-    if (base.startsWith('Dynamic')) {
-      const plainType = base.replace('Dynamic', '').toLowerCase();
-      // Special case for DynamicStringList -> array -> string[]
-      const t = plainType === 'stringlist' ? 'string[]' : plainType;
-      return `${t} | {"path":"..."} | {"call":"..."}`;
-    }
-    return base;
-  }
+  if (prop.$ref) return prop.$ref.split('/').pop() || 'unknown';
 
-  // 2. Enum values (if type is string/number)
   if (prop.enum && prop.enum.length > 0) {
-    // We handle the values display at the property line level, so just return the base type
-    return prop.type || 'string';
+    const enumStr = prop.type || 'string';
+    return prop.description ? `${enumStr} ("${prop.description}")` : enumStr;
   }
 
-  // 3. Arrays
   if (prop.type === 'array') {
-    if (prop.items) {
-      const itemType = formatPropertyType(prop.items, depth + 1);
-      return `array[${itemType}]`;
-    }
+    if (prop.items) return `array[${formatPropertyTypeShallow(prop.items, defs)}]`;
     return 'array';
   }
 
-  // 4. Objects (inline schema extraction)
   if (prop.type === 'object' && prop.properties) {
-    const props: string[] = [];
-    for (const [key, val] of Object.entries(prop.properties)) {
-      const isReq = prop.required && Array.isArray(prop.required) ? prop.required.includes(key) : false;
-      const t = formatPropertyType(val, depth + 1);
-      props.push(`${key}${isReq ? '' : '?'}: ${t}`);
-    }
-    return `{${props.join(', ')}}`;
+    const parts = Object.entries(prop.properties).map(([k, v]) => {
+      const isReq = Array.isArray((prop as any).required) ? (prop as any).required.includes(k) : false;
+      return `${k}${isReq ? '' : '?'}: ${formatPropertyTypeShallow(v, defs)}`;
+    });
+    const objStr = `{${parts.join(', ')}}`;
+    return prop.description ? `${objStr} ("${prop.description}")` : objStr;
   }
 
-  // 5. oneOf / anyOf
   if (prop.oneOf || prop.anyOf) {
     const branches = (prop.oneOf ?? prop.anyOf)!;
-    const types = branches.map(b => formatPropertyType(b, depth + 1));
-    return types.filter(t => t !== 'any').join(' | ') || 'any';
+    const types = branches.map(b => formatPropertyTypeShallow(b, defs));
+    const unionStr = types.filter(t => t !== 'any').join(' | ') || 'any';
+    return prop.description ? `${unionStr} ("${prop.description}")` : unionStr;
   }
 
-  // 6. allOf
   if (prop.allOf) {
-    // allOf in properties is usually used for conditional constraints,
-    // find the first branch with actual type information
     const primary = prop.allOf.find(b => b.$ref || b.type);
-    if (primary) {
-      return formatPropertyType(primary, depth + 1);
+    if (!primary) return 'any';
+    const baseName = (primary as CatalogProperty).$ref
+      ? ((primary as CatalogProperty).$ref!.split('/').pop() || 'unknown')
+      : formatPropertyTypeShallow(primary as CatalogProperty, defs);
+
+    const annotations: string[] = [];
+    for (const branch of prop.allOf) {
+      if (branch === primary) continue;
+      const bProps = (branch as CatalogProperty).properties;
+      if (bProps) {
+        for (const [k, v] of Object.entries(bProps)) {
+          if ((v as CatalogProperty).const !== undefined) {
+            annotations.push(`${k}: ${JSON.stringify((v as CatalogProperty).const)}`);
+          }
+        }
+      }
+    }
+    return annotations.length > 0 ? `${baseName} (${annotations.join(', ')})` : baseName;
+  }
+
+  const typeStr = prop.type || 'any';
+  return prop.description ? `${typeStr} ("${prop.description}")` : typeStr;
+}
+
+/**
+ * Transitively collects all $def names referenced in a schema (via $ref, oneOf, allOf, etc.).
+ * Cycle-safe via the visited set.
+ */
+function collectReferencedDefNames(
+  schema: CatalogProperty,
+  defs: Record<string, unknown>,
+  visited = new Set<string>()
+): Set<string> {
+  if (schema.$ref) {
+    const name = schema.$ref.split('/').pop() || '';
+    if (name && !visited.has(name) && name in defs) {
+      visited.add(name);
+      collectReferencedDefNames(defs[name] as CatalogProperty, defs, visited);
+    }
+    return visited;
+  }
+  const branches = schema.oneOf ?? schema.anyOf;
+  if (branches) branches.forEach(b => collectReferencedDefNames(b, defs, visited));
+  if (schema.allOf) schema.allOf.forEach(b => collectReferencedDefNames(b as CatalogProperty, defs, visited));
+  if (schema.type === 'array' && schema.items) collectReferencedDefNames(schema.items, defs, visited);
+  if (schema.type === 'object' && schema.properties) {
+    Object.values(schema.properties).forEach(p => collectReferencedDefNames(p, defs, visited));
+  }
+  return visited;
+}
+
+/**
+ * Renders a single type entry for the Types section.
+ * Uses shallow formatting so nested $refs appear as names, not expanded.
+ */
+function renderTypeEntry(name: string, schema: CatalogProperty, defs: Record<string, unknown>): string {
+  const desc = (schema as any).description as string | undefined;
+  const typeStr = formatPropertyTypeShallow(schema, defs);
+  const descPart = desc ? ` ("${desc}")` : '';
+  return `  ${name}${descPart}: ${typeStr}`;
+}
+
+// ---------------------------------------------------------------------------
+// Types Reference rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a compact JSON placeholder string derived entirely from the schema structure.
+ * Resolves #/$defs/<Name> refs from the provided defs dict — no type-name hardcoding.
+ */
+function schemaPlaceholder(
+  schema: Record<string, unknown>,
+  defs: Record<string, unknown>,
+  depth = 0
+): string {
+  if (depth > 2) return '"..."';
+
+  // $ref: resolve #/$defs/<Name> from defs; treat external refs as opaque
+  const ref = schema['$ref'] as string | undefined;
+  if (ref) {
+    const hash = ref.indexOf('#');
+    if (hash !== -1) {
+      const fragment = ref.slice(hash + 1); // e.g. "/$defs/DataBinding"
+      const parts = fragment.split('/').filter(Boolean);
+      if (parts[0] === '$defs' && parts[1] && parts[1] in defs) {
+        return schemaPlaceholder(defs[parts[1]] as Record<string, unknown>, defs, depth + 1);
+      }
+    }
+    return '"..."';
+  }
+
+  const type = schema['type'] as string | undefined;
+
+  // object: derive from required + properties
+  if (type === 'object') {
+    const props = schema['properties'] as Record<string, Record<string, unknown>> | undefined;
+    const required = (schema['required'] as string[] | undefined) ?? [];
+    if (props && required.length > 0) {
+      const sub = required.slice(0, 2).map(k =>
+        `"${k}":${schemaPlaceholder((props[k] ?? {}) as Record<string, unknown>, defs, depth + 1)}`
+      );
+      return `{${sub.join(',')}}`;
+    }
+    return '{...}';
+  }
+
+  if (type === 'string') return '"..."';
+  if (type === 'number') return '42';
+  if (type === 'boolean') return 'true';
+
+  if (type === 'array') {
+    const items = schema['items'] as Record<string, unknown> | undefined;
+    if (items) return `[${schemaPlaceholder(items, defs, depth + 1)}]`;
+    return '[...]';
+  }
+
+  // oneOf / anyOf: return the first branch that yields a non-trivial placeholder
+  const polyBranches = (schema['oneOf'] ?? schema['anyOf']) as Record<string, unknown>[] | undefined;
+  if (polyBranches) {
+    for (const branch of polyBranches) {
+      const p = schemaPlaceholder(branch as Record<string, unknown>, defs, depth + 1);
+      if (p !== '"..."') return p;
+    }
+    return '"..."';
+  }
+
+  // allOf: merge primary example with any extra const-constrained properties
+  const allOf = schema['allOf'] as Record<string, unknown>[] | undefined;
+  if (allOf) return exampleFromAllOf(allOf, defs, depth);
+
+  return '"..."';
+}
+
+/**
+ * Handles allOf schemas by deriving an example from the primary branch and
+ * merging in any additional const-constrained properties from sibling branches.
+ * This covers the Dynamic-type pattern:
+ *   {allOf: [{$ref:"#/$defs/FunctionCall"}, {properties:{returnType:{const:"string"}}}]}
+ * without naming types explicitly.
+ */
+function exampleFromAllOf(
+  allOf: Record<string, unknown>[],
+  defs: Record<string, unknown>,
+  depth: number
+): string {
+  // Find the primary branch (has $ref or type) and get its base example
+  const primary = allOf.find(b => b['$ref'] || b['type']);
+  const baseExample = primary
+    ? schemaPlaceholder(primary as Record<string, unknown>, defs, depth + 1)
+    : '"..."';
+
+  // Collect const-constrained keys from all other branches' properties
+  const extraPairs: string[] = [];
+  for (const branch of allOf) {
+    if (branch === primary) continue;
+    const bProps = branch['properties'] as Record<string, Record<string, unknown>> | undefined;
+    if (!bProps) continue;
+    for (const [key, propDef] of Object.entries(bProps)) {
+      const constVal = propDef['const'];
+      if (constVal !== undefined) {
+        extraPairs.push(`"${key}":${JSON.stringify(constVal)}`);
+      }
     }
   }
 
-  return prop.type || 'any';
+  // Merge extras into the base object example if possible
+  if (extraPairs.length > 0 && baseExample.startsWith('{') && baseExample !== '{...}') {
+    const inner = baseExample.slice(1, -1); // strip outer braces
+    return `{${inner},${extraPairs.join(',')}}`;
+  }
+
+  return baseExample;
 }
+
 
 export function generateCatalogPrompt(catalog: Catalog): string {
   const cached = catalogPromptCache.get(catalog);
   if (cached) return cached;
 
-  const name = catalog.title;
-  const id = catalog.catalogId;
-
   const lines: string[] = [
-    `## UI Catalog: ${name}`,
-    `**Catalog ID (use this as catalogId in create_surface):** \`${id}\``,
+    `## UI Catalog: ${catalog.title}`,
+    `**Catalog ID (use this as catalogId in create_surface):** \`${catalog.catalogId}\``,
     '',
     catalog.description ?? 'Available UI components for rendering interfaces.',
     '',
-    '### Available Components:',
-    '',
   ];
+
+  // 1. Available Functions — establish callable functions before components reference them
+  const funcEntries = catalog.functions ? Object.entries(catalog.functions) : [];
+  if (funcEntries.length > 0) {
+    lines.push('### Available Functions:', '');
+    lines.push('Use the `args` object to pass named arguments to functions. Use the argument names documented below as keys.');
+    lines.push('');
+    for (const [funcName, func] of funcEntries) {
+      const argsDef = func.properties?.['args'] as Record<string, unknown> | undefined;
+      let sig = '';
+      const argsProps = argsDef?.['properties'] as Record<string, unknown> | undefined;
+      const argsRequired = argsDef?.['required'] as string[] | undefined;
+      if (argsProps && Object.keys(argsProps).length > 0) {
+        const requiredSet = new Set(argsRequired ?? []);
+        const paramParts = Object.entries(argsProps).map(([argName, argSchema]) => {
+          const schema = argSchema as Record<string, unknown>;
+          const desc = schema['description'] as string | undefined;
+          const ref = schema['$ref'] as string | undefined;
+          let typeName = 'any';
+          if (ref) {
+            const base = ref.split('/').pop() || 'any';
+            typeName = base.startsWith('Dynamic') ? base.replace('Dynamic', '').toLowerCase() : base;
+          } else if (schema['type']) {
+            typeName = schema['type'] as string;
+          }
+          const optional = !requiredSet.has(argName);
+          return `${argName}: ${typeName}${optional ? '?' : ''}${desc ? ` /* ${desc} */` : ''}`;
+        });
+        sig = `(${paramParts.join(', ')})`;
+      } else {
+        sig = '()';
+      }
+      const returnType = func.properties?.['returnType']?.const;
+      const ret = returnType ? ` → ${returnType}` : '';
+      lines.push(`**${funcName}**${sig}${ret}`);
+      if (func.description) lines.push(`  ${func.description}`);
+      lines.push('');
+    }
+  }
+
+  // 3. Available Components
+  lines.push('### Available Components:');
+  lines.push('');
+
+  const allReferencedNames = new Set<string>();
 
   for (const [componentName, component] of Object.entries(catalog.components)) {
     lines.push(`**${componentName}**`);
@@ -554,12 +638,13 @@ export function generateCatalogPrompt(catalog: Catalog): string {
 
       const reqProps: string[] = [];
       const optProps: string[] = [];
+      const catalogDefs = (catalog.$defs as Record<string, unknown>) ?? {};
 
       for (const [propName, prop] of Object.entries(allProps)) {
         if (propName === 'component') continue;
 
-        // Get robust compact type string
-        const typeStr = formatPropertyType(prop);
+        const typeStr = formatPropertyTypeShallow(prop, catalogDefs);
+        collectReferencedDefNames(prop, catalogDefs, allReferencedNames);
 
         // Extract enum values — check top-level first, then drill into oneOf/anyOf branches
         let enumValues = prop.enum;
@@ -571,7 +656,7 @@ export function generateCatalogPrompt(catalog: Catalog): string {
             }
           }
         }
-        
+
         const enumSuffix = enumValues && enumValues.length > 0 ? ` (values: ${enumValues.join(', ')})` : '';
         const defaultSuffix = prop.default !== undefined ? ` (default: ${JSON.stringify(prop.default)})` : '';
         const desc = prop.description ? ` — ${prop.description}` : '';
@@ -592,6 +677,7 @@ export function generateCatalogPrompt(catalog: Catalog): string {
         lines.push('    [OPTIONAL]');
         lines.push(...optProps);
       }
+
     }
 
     // Check for children support
@@ -605,90 +691,305 @@ export function generateCatalogPrompt(catalog: Catalog): string {
     lines.push('');
   }
 
-  // Include Available Functions
-  const funcEntries = catalog.functions ? Object.entries(catalog.functions) : [];
-  if (funcEntries.length > 0) {
-    lines.push('### Available Functions:', '');
-    lines.push('Use the `args` object to pass named arguments to functions. Use the argument names documented below as keys.');
-    lines.push('');
-    for (const [name, func] of funcEntries) {
-      // Build parameter signature from schema
-      const argsDef = func.args as Record<string, unknown> | undefined;
-      const params = func.parameters as Record<string, unknown> | undefined;
-
-      let sig = '';
-      // Prefer new args.properties format
-      const argsProps = argsDef?.['properties'] as Record<string, unknown> | undefined;
-      const argsRequired = argsDef?.['required'] as string[] | undefined;
-      if (argsProps && Object.keys(argsProps).length > 0) {
-        const requiredSet = new Set(argsRequired ?? []);
-        const paramParts = Object.entries(argsProps).map(([argName, argSchema]) => {
-          const schema = argSchema as Record<string, unknown>;
-          const desc = schema['description'] as string | undefined;
-          const ref = schema['$ref'] as string | undefined;
-          let typeName = 'any';
-          if (ref) {
-            const base = ref.split('/').pop() || 'any';
-            typeName = base.startsWith('Dynamic') ? base.replace('Dynamic', '').toLowerCase() : base;
-          } else if (schema['type']) {
-            typeName = schema['type'] as string;
-          }
-          const optional = !requiredSet.has(argName);
-          return `${argName}: ${typeName}${optional ? '?' : ''}${desc ? ` /* ${desc} */` : ''}`;
-        });
-        sig = `(${paramParts.join(', ')})`;
-      } else if (params) {
-        // Fallback: legacy parameters format
-        const items = params['items'];
-        const allOfParams = params['allOf'];
-        const props = params['properties'] as Record<string, unknown>;
-        if (Array.isArray(items) && items.length > 0) {
-          const paramParts = items.map((item: Record<string, unknown>, i: number) => {
-            const paramName = item['name'] as string | undefined;
-            const desc = item['description'] as string | undefined;
-            const ref = item['$ref'] as string | undefined;
-            let typeName = 'any';
-            if (ref) {
-              const base = ref.split('/').pop() || 'any';
-              typeName = base.startsWith('Dynamic') ? base.replace('Dynamic', '').toLowerCase() : base;
-            } else if (item['type']) {
-              typeName = item['type'] as string;
-            }
-            const minItems = params?.['minItems'] as number | undefined;
-            const optional = minItems !== undefined && i >= minItems;
-            const label = paramName ? `${paramName}: ${typeName}` : typeName;
-            return `${label}${optional ? '?' : ''}${desc ? ` /* ${desc} */` : ''}`;
-          });
-          sig = `(${paramParts.join(', ')})`;
-        } else if (allOfParams && Array.isArray(allOfParams)) {
-          const argsObj = (allOfParams as any[]).find((p: any) => p.type === 'object' && p.properties);
-          if (argsObj && argsObj.properties) {
-             const keys = Object.keys(argsObj.properties);
-             sig = `(${keys.map(k => `${k}: ${(argsObj.properties[k] as any).type || 'any'}`).join(', ')})`;
-          } else {
-             sig = '()';
-          }
-        } else if (props) {
-          const keys = Object.keys(props);
-          sig = `(${keys.map(k => `${k}: ${(props[k] as any).type || 'any'}`).join(', ')})`;
-        } else {
-          sig = '()';
-        }
-      } else {
-        sig = '()';
+  // Single shared Types section for all components
+  const catalogDefs = (catalog.$defs as Record<string, unknown>) ?? {};
+  if (allReferencedNames.size > 0) {
+    lines.push('### Types:');
+    for (const name of allReferencedNames) {
+      if (name in catalogDefs) {
+        lines.push(renderTypeEntry(name, catalogDefs[name] as CatalogProperty, catalogDefs));
       }
-      const ret = func.returnType ? ` → ${func.returnType}` : '';
-      lines.push(`**${name}**${sig}${ret}`);
-      if (func.description) {
-        lines.push(`  ${func.description}`);
-      }
-      lines.push('');
     }
+    lines.push('');
   }
 
   const result = lines.join('\n');
   catalogPromptCache.set(catalog, result);
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Catalog index (slim) + per-item detail generators
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a slim catalog index: component/function names, one-line descriptions,
+ * and a hint to call get_component_details / get_function_details for full details.
+ */
+export function generateCatalogIndex(catalog: Catalog): string {
+  const lines: string[] = [
+    `## UI Catalog: ${catalog.title}`,
+    `**Catalog ID (use this as catalogId in create_surface):** \`${catalog.catalogId}\``,
+    '',
+    catalog.description ?? 'Available UI components for rendering interfaces.',
+    '',
+  ];
+
+  lines.push('### Components');
+  lines.push('Call `get_component_details` with component names before using any component.');
+  lines.push('');
+  for (const [name, component] of Object.entries(catalog.components)) {
+    const desc = extractDescription(component);
+    const firstSentence = desc ? ` — ${desc.split('.')[0]}` : '';
+    lines.push(`- **${name}**${firstSentence}`);
+  }
+  lines.push('');
+
+  const funcEntries = catalog.functions ? Object.entries(catalog.functions) : [];
+  if (funcEntries.length > 0) {
+    lines.push('### Functions');
+    lines.push('Call `get_function_details` with function names before using any function.');
+    lines.push('');
+    for (const [name, func] of funcEntries) {
+      const desc = func.description ? ` — ${func.description.split('.')[0]}` : '';
+      lines.push(`- **${name}**${desc}`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+// Detail caches — pre-warmed at catalog registration time, keyed by "catalogId:name"
+const componentDetailCache = new Map<string, string>();
+const componentRefsCache = new Map<string, Set<string>>();
+const functionDetailCache = new Map<string, string>();
+
+/**
+ * Generates and returns the full detail block for a set of component names,
+ * with a single shared Types section at the end covering all referenced $defs.
+ * Results are served from the detail cache (pre-warmed at catalog registration).
+ */
+export function generateComponentDetails(catalog: Catalog, componentNames: string[]): string {
+  const lines: string[] = [];
+  const unknown: string[] = [];
+  const allReferencedNames = new Set<string>();
+
+  for (const name of componentNames) {
+    const key = `${catalog.catalogId}:${name}`;
+    const cached = componentDetailCache.get(key);
+    const cachedRefs = componentRefsCache.get(key);
+    if (cached && cachedRefs) {
+      lines.push(cached);
+      cachedRefs.forEach(n => allReferencedNames.add(n));
+    } else {
+      const entry = Object.entries(catalog.components).find(([n]) => n === name);
+      if (!entry) {
+        unknown.push(name);
+        continue;
+      }
+      const refs = new Set<string>();
+      const detail = renderComponentDetail(catalog, entry[0], entry[1], refs);
+      componentDetailCache.set(key, detail);
+      componentRefsCache.set(key, refs);
+      refs.forEach(n => allReferencedNames.add(n));
+      lines.push(detail);
+    }
+  }
+
+  if (unknown.length > 0) {
+    const available = Object.keys(catalog.components).join(', ');
+    lines.push(`Unknown component(s): ${unknown.join(', ')}. Available: ${available}`);
+  }
+
+  const defs = (catalog.$defs as Record<string, unknown>) ?? {};
+  if (allReferencedNames.size > 0) {
+    lines.push('Types:');
+    for (const name of allReferencedNames) {
+      if (name in defs) lines.push(renderTypeEntry(name, defs[name] as CatalogProperty, defs));
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Generates and returns the full detail block for a set of function names.
+ * Results are served from the detail cache (pre-warmed at catalog registration).
+ */
+export function generateFunctionDetails(catalog: Catalog, functionNames: string[]): string {
+  if (!catalog.functions) {
+    return 'This catalog has no functions.';
+  }
+
+  const lines: string[] = [];
+  const unknown: string[] = [];
+
+  for (const name of functionNames) {
+    const key = `${catalog.catalogId}:fn:${name}`;
+    const cached = functionDetailCache.get(key);
+    if (cached) {
+      lines.push(cached);
+    } else {
+      const func = catalog.functions[name];
+      if (!func) {
+        unknown.push(name);
+        continue;
+      }
+      const detail = renderFunctionDetail(name, func);
+      functionDetailCache.set(key, detail);
+      lines.push(detail);
+    }
+  }
+
+  if (unknown.length > 0) {
+    const available = Object.keys(catalog.functions).join(', ');
+    lines.push(`Unknown function(s): ${unknown.join(', ')}. Available: ${available}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Pre-warms the component and function detail caches for a catalog.
+ * Call this when a catalog is registered so all detail lookups are instant.
+ */
+export function prewarmCatalogDetailCache(catalog: Catalog): void {
+  for (const [name, component] of Object.entries(catalog.components)) {
+    const key = `${catalog.catalogId}:${name}`;
+    if (!componentDetailCache.has(key)) {
+      const refs = new Set<string>();
+      componentDetailCache.set(key, renderComponentDetail(catalog, name, component, refs));
+      componentRefsCache.set(key, refs);
+    }
+  }
+  if (catalog.functions) {
+    for (const [name, func] of Object.entries(catalog.functions)) {
+      const key = `${catalog.catalogId}:fn:${name}`;
+      if (!functionDetailCache.has(key)) {
+        functionDetailCache.set(key, renderFunctionDetail(name, func));
+      }
+    }
+  }
+}
+
+/** Renders the full detail block for a single component (extracted from generateCatalogPrompt logic).
+ *  If `referencedNames` is provided, referenced $def names are collected into it (caller appends shared Types section). */
+function renderComponentDetail(catalog: Catalog, componentName: string, component: CatalogComponent, referencedNames?: Set<string>): string {
+  const lines: string[] = [];
+  lines.push(`**${componentName}**`);
+  const componentDesc = extractDescription(component);
+  if (componentDesc) lines.push(`  ${componentDesc}`);
+
+  const allProps: Record<string, CatalogProperty> = {};
+  const collectProps = (def: CatalogComponent, depth = 0) => {
+    if (depth > 5) return;
+    if (def.properties) Object.assign(allProps, def.properties);
+    if (def.allOf) {
+      def.allOf.forEach(sub => {
+        const subDef = sub as CatalogComponent & { $ref?: string };
+        if (subDef.$ref) {
+          const resolved = resolveRef(subDef.$ref, catalog.$defs as Record<string, unknown>);
+          if (resolved) collectProps(resolved as CatalogComponent, depth + 1);
+        } else {
+          collectProps(subDef, depth + 1);
+        }
+      });
+    }
+    if ((def as any).$ref && !def.properties && !def.allOf) {
+      const resolved = resolveRef((def as any).$ref, catalog.$defs as Record<string, unknown>);
+      if (resolved) collectProps(resolved as CatalogComponent, depth + 1);
+    }
+  };
+  collectProps(component);
+
+  const requiredFields = new Set<string>();
+  const collectRequired = (def: CatalogComponent, depth = 0) => {
+    if (depth > 5) return;
+    if (def.properties) {
+      for (const [key, prop] of Object.entries(def.properties)) {
+        if (prop.required) requiredFields.add(key);
+      }
+    }
+    if (Array.isArray((def as any).required)) {
+      ((def as any).required as string[]).forEach((k: string) => requiredFields.add(k));
+    }
+    if (def.allOf) {
+      def.allOf.forEach(sub => {
+        const subDef = sub as CatalogComponent & { $ref?: string };
+        if (subDef.$ref) {
+          const resolved = resolveRef(subDef.$ref, catalog.$defs as Record<string, unknown>);
+          if (resolved) collectRequired(resolved as CatalogComponent, depth + 1);
+        } else {
+          collectRequired(subDef, depth + 1);
+        }
+      });
+    }
+  };
+  collectRequired(component);
+
+  if (Object.keys(allProps).length > 0) {
+    lines.push('  Properties:');
+    const reqProps: string[] = [];
+    const optProps: string[] = [];
+
+    const defs = (catalog.$defs as Record<string, unknown>) ?? {};
+
+    for (const [propName, prop] of Object.entries(allProps)) {
+      if (propName === 'component') continue;
+      const typeStr = formatPropertyTypeShallow(prop, defs);
+      if (referencedNames) collectReferencedDefNames(prop, defs, referencedNames);
+      let enumValues = prop.enum;
+      if ((!enumValues || enumValues.length === 0) && (prop.oneOf || prop.anyOf)) {
+        for (const branch of (prop.oneOf ?? prop.anyOf)!) {
+          if (branch.enum && branch.enum.length > 0) { enumValues = branch.enum; break; }
+        }
+      }
+      const enumSuffix = enumValues && enumValues.length > 0 ? ` (values: ${enumValues.join(', ')})` : '';
+      const defaultSuffix = prop.default !== undefined ? ` (default: ${JSON.stringify(prop.default)})` : '';
+      const desc = prop.description ? ` — ${prop.description}` : '';
+      const line = `    - ${propName}: ${typeStr}${enumSuffix}${defaultSuffix}${desc}`;
+      if (requiredFields.has(propName)) reqProps.push(line);
+      else optProps.push(line);
+    }
+
+    if (reqProps.length > 0) { lines.push('    [REQUIRED]'); lines.push(...reqProps); }
+    if (optProps.length > 0) { lines.push('    [OPTIONAL]'); lines.push(...optProps); }
+  }
+
+  const supportsChildren = component.children === true || allProps['children'] !== undefined;
+  if (supportsChildren) lines.push('  Supports children: yes');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+/** Renders the full detail block for a single function (extracted from generateCatalogPrompt logic). */
+function renderFunctionDetail(funcName: string, func: Catalog['functions'] extends Record<string, infer V> | undefined ? V : never): string {
+  const lines: string[] = [];
+  const argsDef = func.properties?.['args'] as Record<string, unknown> | undefined;
+  const argsProps = argsDef?.['properties'] as Record<string, unknown> | undefined;
+  const argsRequired = argsDef?.['required'] as string[] | undefined;
+
+  let sig = '';
+  if (argsProps && Object.keys(argsProps).length > 0) {
+    const requiredSet = new Set(argsRequired ?? []);
+    const paramParts = Object.entries(argsProps).map(([argName, argSchema]) => {
+      const schema = argSchema as Record<string, unknown>;
+      const desc = schema['description'] as string | undefined;
+      const ref = schema['$ref'] as string | undefined;
+      let typeName = 'any';
+      if (ref) {
+        const base = ref.split('/').pop() || 'any';
+        typeName = base.startsWith('Dynamic') ? base.replace('Dynamic', '').toLowerCase() : base;
+      } else if (schema['type']) {
+        typeName = schema['type'] as string;
+      }
+      const optional = !requiredSet.has(argName);
+      return `${argName}: ${typeName}${optional ? '?' : ''}${desc ? ` /* ${desc} */` : ''}`;
+    });
+    sig = `(${paramParts.join(', ')})`;
+  } else {
+    sig = '()';
+  }
+
+  const returnType = func.properties?.['returnType']?.const;
+  const ret = returnType ? ` → ${returnType}` : '';
+  lines.push(`**${funcName}**${sig}${ret}`);
+  if (func.description) lines.push(`  ${func.description}`);
+  lines.push('');
+
+  return lines.join('\n');
 }
 
 // Ajv singleton — compiled validators are cached per component type per catalog
@@ -815,11 +1116,15 @@ const catalogComponentSchema = z.object({
 }).passthrough();
 
 const catalogFunctionSchema = z.object({
-  name: z.string().optional(),
+  type: z.string().optional(),
   description: z.string().optional(),
-  args: z.record(z.unknown()).optional(),
-  parameters: z.record(z.unknown()).optional(),
-  returnType: z.string().optional(),
+  properties: z.object({
+    call: z.object({ const: z.string() }).optional(),
+    args: z.record(z.unknown()).optional(),
+    returnType: z.object({ const: z.string() }).optional(),
+  }).passthrough().optional(),
+  required: z.array(z.string()).optional(),
+  unevaluatedProperties: z.boolean().optional(),
 }).passthrough();
 
 export const catalogSchema = z.object({

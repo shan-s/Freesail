@@ -572,9 +572,9 @@ export function Modal({ component, children, onAction, onFunctionCall }: Freesai
   const modalRef = React.useRef<HTMLDivElement>(null);
 
   const handleClose = () => {
-    // Hide the modal via hideComponent (writes to data model, triggers re-render)
+    // Hide the modal via hide (writes to data model, triggers re-render)
     if (onFunctionCall) {
-      onFunctionCall({ call: 'hideComponent', args: { componentId: component.id } });
+      onFunctionCall({ call: 'hide', args: { componentId: component.id } });
     }
     // Notify the agent that the modal was closed
     if (onAction) {

@@ -204,7 +204,7 @@ function renderComponent(
   const resolvedProps = resolveDataBindings(componentDef, dataModel, catalogId, scopeData, scopeBasePath);
 
   // Visibility check: if `visible` resolves to exactly false, skip rendering.
-  // Data-model override (from showComponent/hideComponent) takes precedence over component prop.
+  // Data-model override (from show/hide) takes precedence over component prop.
   const visibilityOverride = getDataAtPath(dataModel, `/__componentState/${componentId}/visible`);
   const effectiveVisible = visibilityOverride !== undefined ? visibilityOverride : resolvedProps['visible'];
   if (effectiveVisible === false) {
@@ -225,7 +225,7 @@ function renderComponent(
     onDataChange,
     onFunctionCall: (call) => {
        const result = evaluateFunction(call, dataModel, catalogId, scopeData);
-       // Handle side-effect returns (e.g. showComponent/hideComponent writes to data model)
+       // Handle side-effect returns (e.g. show/hide writes to data model)
        if (result && typeof result === 'object' && '__sideEffect' in (result as Record<string, unknown>)) {
          const sideEffect = result as { __sideEffect: string; path: string; value: unknown };
          if (sideEffect.__sideEffect === 'dataModelUpdate') {

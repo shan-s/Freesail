@@ -203,27 +203,42 @@
 
     "CatalogFunction": {
       "type": "object",
-      "description": "A client-side function declaration. The gateway lists these in the system prompt so the agent knows what expressions are valid in component properties, action handlers, and check conditions.",
+      "description": "A client-side function declaration. Each definition IS a JSON Schema for its own call object, enabling discriminated union validation via anyFunction.",
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "const": "object",
+          "description": "Always 'object' — each function definition is a JSON Schema for its call object."
+        },
         "description": {
           "type": "string",
-          "description": "What the function does. Shown in the system prompt. Required for agent-facing catalogs."
+          "description": "What the function does. Shown in the system prompt."
         },
-        "returnType": {
-          "type": "string",
-          "enum": ["string", "number", "boolean", "array", "object", "void", "any"],
-          "description": "The value type this function returns."
-        },
-        "args": {
+        "properties": {
           "type": "object",
-          "description": "JSON Schema describing the accepted arguments as an object with named properties. Used for documentation and tooling only.",
-          "additionalProperties": true
+          "description": "JSON Schema properties for the call object: call (const discriminator), args (named arguments), returnType (const return type).",
+          "properties": {
+            "call": {
+              "type": "object",
+              "properties": { "const": { "type": "string" } },
+              "required": ["const"]
+            },
+            "args": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "returnType": {
+              "type": "object",
+              "properties": { "const": { "type": "string" } }
+            }
+          },
+          "additionalProperties": false
         },
-        "parameters": {
-          "type": "object",
-          "description": "Deprecated. Use 'args' instead. Legacy positional array format for function arguments.",
-          "additionalProperties": true
+        "required": {
+          "$ref": "#/$defs/RequiredList"
+        },
+        "unevaluatedProperties": {
+          "type": "boolean"
         }
       }
     },

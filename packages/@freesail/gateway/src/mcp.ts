@@ -22,7 +22,7 @@ import {
   type A2UIComponent,
   type DownstreamMessage,
 } from '@freesail/core';
-import { generateCatalogPrompt, validateComponent } from './converter.js';
+import { generateCatalogIndex, generateComponentDetails, generateFunctionDetails, validateComponent } from './converter.js';
 import type { SessionManager } from './session.js';
 
 /**
@@ -381,16 +381,21 @@ export function createMCPServer(options: MCPServerOptions): { server: McpServer;
     'update_components',
     {
       description:
-        'Update the component tree of a surface. Components are defined as a flat list ' +
-        'with parent-child relationships specified via the children array. ' +
-        'One component MUST have id "root" to serve as the component tree root.',
+        'Update the component tree of a surface. ' +
+        'IMPORTANT: Every entry MUST include a "component" field with the type name from the catalog (e.g. "Text", "Column", "Button"). ' +
+        'The array MUST be completely flat — never nest component objects inside other objects. ' +
+        'Use children: ["id1", "id2"] to express parent-child relationships. ' +
+        'Exactly one component in the surfaceMUST have id "root" to serve as the component tree root.',
       inputSchema: {
         surfaceId: z.string().describe('The surface to update'),
         sessionId: z.string().describe('Target client session ID'),
-        components: z.array(z.object({
-          id: z.string().describe('Component ID (use "root" for the root component)'),
-          component: z.string().describe('Component type from catalog (e.g., "Text", "Column", "Button")'),
-        }).passthrough()).describe('Array of component definitions. Use child/children properties as specified in the catalog.'),
+        components: z.preprocess(
+          (val) => Array.isArray(val) ? (val as unknown[]).flat() : val,
+          z.array(z.object({
+            id: z.string().describe('Unique component ID. The root component must use id "root".'),
+            component: z.string().describe('Component type name from the catalog (e.g. "Text", "Column", "Button"). REQUIRED on every entry.'),
+          }).passthrough())
+        ).describe('Flat array of component definitions. MUST be flat — never nest arrays. Every entry must have "component". Use children: ["id"] for parent-child relationships.'),
       },
     },
     async ({ surfaceId, sessionId, components }) => {
@@ -699,9 +704,10 @@ export function createMCPServer(options: MCPServerOptions): { server: McpServer;
     'get_catalogs',
     {
       description:
-        'Get the catalogs supported by a specific client session, including full component definitions. ' +
-        'Returns an array of { catalogId, title, content } objects. ' +
-        'Use the catalogId when calling create_surface. Read the content to understand available components.',
+        'Get a summary of catalogs supported by a specific client session. ' +
+        'Returns an array of { catalogId, title, content } objects where content lists component and function names with brief descriptions. ' +
+        'Use the catalogId when calling create_surface. ' +
+        'Call get_component_details or get_function_details to get full property details before building a surface.',
       inputSchema: {
         sessionId: z.string().describe('The client session ID'),
       },
@@ -730,10 +736,78 @@ export function createMCPServer(options: MCPServerOptions): { server: McpServer;
       const result = catalogs.map(c => ({
         catalogId: c.catalogId,
         title: c.title,
-        content: generateCatalogPrompt(c),
+        content: generateCatalogIndex(c),
       }));
       return {
         content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    'get_component_details',
+    {
+      description:
+        'Get full property details for one or more components from a catalog. ' +
+        'Call this before using any component in update_components to understand its required and optional properties.',
+      inputSchema: {
+        sessionId: z.string().describe('The client session ID'),
+        catalogId: z.string().describe('The catalog ID to look up components in'),
+        components: z.array(z.string()).describe('Component names to get details for, e.g. ["Column", "Button", "Text"]'),
+      },
+    },
+    async ({ sessionId, catalogId, components }) => {
+      const session = sessionManager.getSession(sessionId);
+      if (!session) {
+        return { content: [{ type: 'text', text: `Session ${sessionId} not found.` }], isError: true };
+      }
+      const catalogs = sessionManager.getCatalogsForSession(sessionId);
+      const catalog = catalogs.find(c => c.catalogId === catalogId);
+      if (!catalog) {
+        const available = catalogs.map(c => c.catalogId).join(', ');
+        return {
+          content: [{ type: 'text', text: `Catalog '${catalogId}' not found for this session. Available: ${available}` }],
+          isError: true,
+        };
+      }
+      const componentDetails = generateComponentDetails(catalog, components);
+      logger.debug(`[MCP] get_component_details for catalog '${catalogId}', components: ${components.join(', ')}\n${componentDetails}`);
+      return {
+        content: [{ type: 'text', text: componentDetails }],
+      };
+    }
+  );
+
+  server.registerTool(
+    'get_function_details',
+    {
+      description:
+        'Get full usage details for one or more functions from a catalog. ' +
+        'Call this before using any function call expression to understand its arguments and return type.',
+      inputSchema: {
+        sessionId: z.string().describe('The client session ID'),
+        catalogId: z.string().describe('The catalog ID to look up functions in'),
+        functions: z.array(z.string()).describe('Function names to get details for, e.g. ["formatString", "formatDate"]'),
+      },
+    },
+    async ({ sessionId, catalogId, functions }) => {
+      const session = sessionManager.getSession(sessionId);
+      if (!session) {
+        return { content: [{ type: 'text', text: `Session ${sessionId} not found.` }], isError: true };
+      }
+      const catalogs = sessionManager.getCatalogsForSession(sessionId);
+      const catalog = catalogs.find(c => c.catalogId === catalogId);
+      if (!catalog) {
+        const available = catalogs.map(c => c.catalogId).join(', ');
+        return {
+          content: [{ type: 'text', text: `Catalog '${catalogId}' not found for this session. Available: ${available}` }],
+          isError: true,
+        };
+      }
+      const functionDetails = generateFunctionDetails(catalog, functions);
+      logger.debug(`[MCP] get_function_details for catalog '${catalogId}', functions: ${functions.join(', ')}\n${functionDetails}`);
+      return {
+        content: [{ type: 'text', text: functionDetails }],
       };
     }
   );

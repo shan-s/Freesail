@@ -248,10 +248,15 @@ export function prepareCatalog(config: CatalogConfig): boolean {
   if (common) {
     const commonComponentsJson = readJsonSafe(path.join(common.dir, 'common_components.json'));
     const commonFunctionsJson = readJsonSafe(path.join(common.dir, 'common_functions.json'));
+    const commonTypesJson = readJsonSafe(path.join(common.dir, 'common_types.json'));
 
     const commonComponents = (commonComponentsJson?.['components'] ?? {}) as Record<string, unknown>;
     const commonFunctions = (commonFunctionsJson?.['functions'] ?? {}) as Record<string, unknown>;
-    const commonDefs = (commonComponentsJson?.['$defs'] ?? {}) as Record<string, unknown>;
+    const commonComponentDefs = (commonComponentsJson?.['$defs'] ?? {}) as Record<string, unknown>;
+    const commonTypeDefs = (commonTypesJson?.['$defs'] ?? {}) as Record<string, unknown>;
+
+    // Merge: common_types.$defs first (lowest precedence), then common_components.$defs
+    const commonDefs: Record<string, unknown> = { ...commonTypeDefs, ...commonComponentDefs };
 
     rewrittenComponents = rewriteRefs(commonComponents, common.refPrefix) as Record<string, unknown>;
     rewrittenFunctions = rewriteRefs(commonFunctions, common.refPrefix) as Record<string, unknown>;
@@ -338,6 +343,18 @@ export function prepareCatalog(config: CatalogConfig): boolean {
     }
   }
 
+  // 8. Generate anyComponent and anyFunction discriminated unions
+  const anyComponent: Record<string, unknown> = {
+    oneOf: Object.keys(mergedComponents).map(name => ({ $ref: `#/components/${name}` })),
+    discriminator: { propertyName: 'component' },
+  };
+  const finalDefs: Record<string, unknown> = { ...mergedDefs, anyComponent };
+  if (Object.keys(mergedFunctions).length > 0) {
+    finalDefs['anyFunction'] = {
+      oneOf: Object.keys(mergedFunctions).map(name => ({ $ref: `#/functions/${name}` })),
+    };
+  }
+
   const catalog: Record<string, unknown> = {};
   if (schemaPath) catalog['$schema'] = schemaPath;
   catalog['$id'] = meta.catalogId;
@@ -350,9 +367,7 @@ export function prepareCatalog(config: CatalogConfig): boolean {
     catalog['functions'] = mergedFunctions;
   }
 
-  if (Object.keys(mergedDefs).length > 0) {
-    catalog['$defs'] = mergedDefs;
-  }
+  catalog['$defs'] = finalDefs;
 
   // 8. Write output
   const outputFile = `${config.prefix}_catalog.json`;

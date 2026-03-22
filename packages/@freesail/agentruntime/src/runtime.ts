@@ -356,7 +356,11 @@ export class FreesailAgentRuntime {
         if (!rawAction) continue;
 
         // Skip internal lifecycle events — handled via sessions list subscription
-        if (rawAction.name?.startsWith("__session_")) continue;
+        if (typeof rawAction.name !== 'string') {
+          logger.warn(`[AgentRuntime] Skipping action with non-string name (session=${sessionId}):`, rawAction.name);
+          continue;
+        }
+        if (rawAction.name.startsWith("__session_")) continue;
 
         logger.debug(
           `[AgentRuntime] Routing Action: ${rawAction.name} (session=${sessionId})`,

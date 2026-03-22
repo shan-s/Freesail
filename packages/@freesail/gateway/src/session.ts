@@ -20,7 +20,7 @@ const logger = createLogger(['freesail', 'session']);
 // Sub-loggers for surface events — filterable independently via --log-filter
 const agentSurfaceLogger  = createLogger(['freesail', 'session', 'agent-surface']);
 const clientSurfaceLogger = createLogger(['freesail', 'session', 'client-surface']);
-import { generateCatalogPrompt, type Catalog } from './converter.js';
+import { generateCatalogPrompt, generateCatalogIndex, prewarmCatalogDetailCache, type Catalog } from './converter.js';
 
 /** Extract the surfaceId embedded in any DownstreamMessage variant. */
 function getSurfaceId(message: DownstreamMessage): string | null {
@@ -201,6 +201,7 @@ export class SessionManager {
         session.catalogIds.add(catalog.id);
       }
       logger.info(`[SessionManager] Registered catalog: ${catalog.title} (${catalog.id}) for session ${sessionId}`);
+      prewarmCatalogDetailCache(catalog);
 
       const logDir = process.env['CATALOG_LOG_DIR'];
       if (logDir) {
@@ -210,7 +211,8 @@ export class SessionManager {
           } else {
             const slug = catalog.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
             const filePath = join(logDir, `${slug}.md`);
-            writeFileSync(filePath, generateCatalogPrompt(catalog), 'utf8');
+            const logContent = generateCatalogIndex(catalog) + '\n---\n\n' + generateCatalogPrompt(catalog);
+            writeFileSync(filePath, logContent, 'utf8');
             logger.info(`[SessionManager] Wrote catalog prompt to ${filePath}`);
           }
         } catch (err) {

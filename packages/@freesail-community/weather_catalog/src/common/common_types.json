@@ -28,6 +28,10 @@
         "id": {
           "$ref": "#/$defs/ComponentId"
         },
+        "component": {
+          "type": "string",
+          "description": "REQUIRED. The component type name (e.g. 'Text', 'Button', 'Column'). Each component's schema further constrains this to its exact const value."
+        },
         "accessibility": {
           "$ref": "#/$defs/AccessibilityAttributes"
         },
@@ -38,7 +42,8 @@
         }
       },
       "required": [
-        "id"
+        "id",
+        "component"
       ]
     },
     "ChildList": {

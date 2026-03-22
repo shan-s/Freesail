@@ -91,27 +91,13 @@ class ComponentRegistry {
     if (!funcs) return;
     const names: Record<string, string[]> = {};
     for (const [funcName, funcDef] of Object.entries(funcs)) {
-      const argsDef = funcDef['args'] as Record<string, unknown> | undefined;
-      // Support new args.properties format
+      const propsField = funcDef['properties'] as Record<string, unknown> | undefined;
+      const argsDef = propsField?.['args'] as Record<string, unknown> | undefined;
       if (argsDef) {
         const props = argsDef['properties'] as Record<string, unknown> | undefined;
         if (props && Object.keys(props).length > 0) {
           names[funcName] = Object.keys(props);
-          continue;
         }
-      }
-      // Fallback: support legacy parameters.items[] format
-      const params = funcDef['parameters'] as Record<string, unknown> | undefined;
-      if (!params) continue;
-      const items = params['items'];
-      if (!Array.isArray(items) || items.length === 0) continue;
-      const paramNameList: string[] = [];
-      for (const item of items) {
-        const name = (item as Record<string, unknown>)['name'] as string | undefined;
-        if (name) paramNameList.push(name);
-      }
-      if (paramNameList.length > 0) {
-        names[funcName] = paramNameList;
       }
     }
     if (Object.keys(names).length > 0) {
