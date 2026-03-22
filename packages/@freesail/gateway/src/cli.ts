@@ -27,7 +27,7 @@ interface CLIConfig {
   /** MCP HTTP host to bind to (if mode is 'http') */
   mcpHost: string;
   /** Webhook URL for forwarding upstream messages. Undocumented for now */
-  //webhookUrl?: string;
+  webhookUrl?: string;
   /** Path to log file */
   logFile?: string;
   /** Minimum log level to emit (default: info) */
