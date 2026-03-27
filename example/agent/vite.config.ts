@@ -6,8 +6,10 @@ export default defineConfig({
     preserveSymlinks: false,
     alias: [
       { find: 'freesail', replacement: path.resolve(__dirname, '../../packages/freesail/src') },
-      { find: '@freesail-community/weathercatalog', replacement: path.resolve(__dirname, '../../packages/@freesail-community/weather_catalog/src') },
-      { find: '@freesail/catalogs', replacement: path.resolve(__dirname, '../../packages/@freesail/catalogs/src') },
+      { find: '@freesail-community/weathercatalog', replacement: path.resolve(__dirname, '../../packages/@freesail-community/weather-catalog/src') },
+      { find: '@freesail/standard-catalog/utils', replacement: path.resolve(__dirname, '../../packages/@freesail/standard-catalog/src/common/common-utils.ts') },
+      { find: '@freesail/standard-catalog', replacement: path.resolve(__dirname, '../../packages/@freesail/standard-catalog/src') },
+      { find: '@freesail/chat-catalog', replacement: path.resolve(__dirname, '../../packages/@freesail/chat-catalog/src') },
       { find: '@freesail/react', replacement: path.resolve(__dirname, '../../packages/@freesail/react/src') },
       { find: '@freesail/core', replacement: path.resolve(__dirname, '../../packages/@freesail/core/src') },
       { find: '@freesail/logger', replacement: path.resolve(__dirname, '../../packages/@freesail/logger/src') },

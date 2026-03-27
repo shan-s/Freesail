@@ -1,0 +1,18 @@
+{
+  "includes": {
+    "@freesail/standard-catalog": {
+      "catalogPath": "dist/standard-catalog.json",
+      "components": [
+      ],
+      "functions": [
+        "formatString"
+      ],
+      "defs": [
+        "ComponentCommon",
+        "DynamicString",
+        "ChildList",
+        "DynamicBoolean"
+      ]
+    }
+  }
+}

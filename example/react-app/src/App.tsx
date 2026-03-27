@@ -7,7 +7,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {ReactUI} from 'freesail';
-import {ChatCatalog,StandardCatalog} from '@freesail/catalogs';
+import { StandardCatalog } from '@freesail/standard-catalog';
+import { ChatCatalog } from '@freesail/chat-catalog';
 import { WeatherCatalog } from '@freesail-community/weathercatalog';
 
 const CHAT_CATALOG_ID = 'https://freesail.dev/catalogs/chat_catalog_v1.json';

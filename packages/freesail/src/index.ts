@@ -7,7 +7,4 @@ export * as Core from '@freesail/core'; // Also provide namespace for power user
 // 2. Framework-specific UI logic (Namespaced)
 export * as ReactUI from '@freesail/react';
 
-// 3. First-party catalogs (Namespaced)
-export * as Catalogs from '@freesail/catalogs';
-
 

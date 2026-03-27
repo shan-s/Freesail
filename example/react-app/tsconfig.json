@@ -20,8 +20,10 @@
       "freesail": ["../../packages/freesail/src"],
       "@freesail/core": ["../../packages/@freesail/core/src"],
       "@freesail/react": ["../../packages/@freesail/react/src"],
-      "@freesail/catalogs": ["../../packages/@freesail/catalogs/src"],
-      "@freesail-community/weathercatalog": ["../../packages/@freesail-community/weather_catalog/src"]
+      "@freesail/standard-catalog": ["../../packages/@freesail/standard-catalog/src"],
+      "@freesail/standard-catalog/utils": ["../../packages/@freesail/standard-catalog/src/common/common-utils.ts"],
+      "@freesail/chat-catalog": ["../../packages/@freesail/chat-catalog/src"],
+      "@freesail-community/weathercatalog": ["../../packages/@freesail-community/weather-catalog/src"]
     }
   },
   "include": [

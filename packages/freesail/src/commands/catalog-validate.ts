@@ -4,6 +4,9 @@
  * Validates a Freesail catalog package for structural integrity and
  * mandatory protocol requirements.
  *
+ * A directory is treated as a catalog if it contains src/catalog.include.json.
+ * Run `freesail prepare catalog` first to generate the catalog JSON if missing.
+ *
  * Checks performed:
  *   1. JSON schema is parseable and has a catalogId
  *   2. Components declared in JSON have matching exports in components.tsx
@@ -11,8 +14,11 @@
  *   4. Mandatory Freesail functions (formatString) are present in the
  *      catalog's runtime function map (index.ts)
  *
- * Run as a prebuild step via the generated package.json:
- *   "prebuild": "freesail validate catalog"
+ * Usage:
+ *   freesail validate catalog [--dir <path>]
+ *
+ * Options:
+ *   --dir, -d <path>   Catalog root directory (default: CWD)
  *
  * Note: This command performs static analysis on the TypeScript source.
  * For a full runtime check (dynamic import of compiled output), use:
@@ -42,62 +48,57 @@ interface CatalogConfig {
   name: string;
   packagePath: string;
   srcPath: string;
-  jsonFile: string;
+  /** null when catalog.include.json exists but prepare hasn't been run yet */
+  jsonFile: string | null;
   prefix: string;
 }
 
-function getCatalogConfig(dir: string, nameOverride?: string): CatalogConfig | null {
-  const folderName = nameOverride ?? path.basename(dir);
-  const match = folderName.match(/^(.+)_catalog(?:_(v\d+))?$/);
-  if (!match) return null;
-
-  const prefix = match[1] as string;
-
+/** Find the generated catalog JSON in srcPath, trying kebab and legacy names. */
+function findJsonFile(srcPath: string, name: string): string | null {
+  const prefix = name.replace(/[-_]catalog$/, '').replace(/-/g, '_');
   const candidates = [
+    `${name}.json`,
+    `${prefix}-catalog.json`,
     `${prefix}_catalog.json`,
     `${prefix}_catalog_v1.json`,
   ];
-
-  // Probe for the JSON file — check dir/src/ first (standalone catalog),
-  // then dir/ itself (monorepo sub-catalog where sources live directly in the folder).
-  let srcDir: string | null = null;
-  let jsonFile: string | null = null;
-
-  for (const probe of [path.join(dir, 'src'), dir]) {
-    if (!fs.existsSync(probe)) continue;
-    for (const candidate of candidates) {
-      if (fs.existsSync(path.join(probe, candidate))) {
-        srcDir = probe;
-        jsonFile = candidate;
-        break;
-      }
-    }
-    if (jsonFile) break;
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(srcPath, candidate))) return candidate;
   }
-
-  if (!srcDir || !jsonFile) return null;
-  if (!fs.existsSync(path.join(srcDir, 'index.ts'))) return null;
-
-  return { name: folderName, packagePath: dir, srcPath: srcDir, jsonFile, prefix };
+  return null;
 }
 
-function discoverCatalogs(): CatalogConfig[] {
-  // 1. CWD is the catalog package root (named {prefix}_catalog)
-  const config = getCatalogConfig(CWD);
-  if (config) return [config];
+function buildCatalogConfig(packagePath: string, srcPath: string): CatalogConfig {
+  const name = path.basename(packagePath);
+  const prefix = name.replace(/[-_]catalog$/, '').replace(/-/g, '_');
+  const jsonFile = findJsonFile(srcPath, name);
+  return { name, packagePath, srcPath, jsonFile, prefix };
+}
 
-  // 2. CWD contains a src/ with catalog files (package name = {prefix}_catalog)
-  const fromSrc = getCatalogConfig(CWD, path.basename(CWD));
-  if (fromSrc) return [fromSrc];
+function parseDirArg(): string | undefined {
+  const args = process.argv.slice(4);
+  const idx = args.findIndex(a => a === '--dir' || a === '-d');
+  if (idx !== -1 && args[idx + 1]) return args[idx + 1];
+  return undefined;
+}
 
-  // 3. Scan src/ subdirectories (monorepo: multiple catalogs in one package)
-  const srcPath = path.join(CWD, 'src');
+function discoverCatalogs(dir: string): CatalogConfig[] {
+  const srcPath = path.join(dir, 'src');
+
+  // Primary: dir itself contains src/includes/catalog.include.json
+  if (fs.existsSync(path.join(srcPath, 'includes', 'catalog.include.json'))) {
+    return [buildCatalogConfig(dir, srcPath)];
+  }
+
+  // Monorepo: scan src/ subdirectories for sub-catalogs each with includes/catalog.include.json
   if (fs.existsSync(srcPath)) {
     const catalogs: CatalogConfig[] = [];
     for (const entry of fs.readdirSync(srcPath, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const sub = getCatalogConfig(path.join(CWD, 'src', entry.name));
-      if (sub) catalogs.push(sub);
+      const subDir = path.join(srcPath, entry.name);
+      if (fs.existsSync(path.join(subDir, 'includes', 'catalog.include.json'))) {
+        catalogs.push(buildCatalogConfig(subDir, subDir));
+      }
     }
     if (catalogs.length > 0) return catalogs;
   }
@@ -201,6 +202,37 @@ function validateRefs(catalog: Record<string, unknown>): boolean {
 // ---------------------------------------------------------------------------
 
 /**
+ * Extract component and function names from a generated-includes.ts file.
+ * Parses the `includedComponents` and `includedFunctions` object literals.
+ */
+function extractIncludedNames(srcPath: string): { components: Set<string>; functions: Set<string> } {
+  const generatedPath = path.join(srcPath, 'includes', 'generated-includes.ts');
+  if (!fs.existsSync(generatedPath)) {
+    return { components: new Set(), functions: new Set() };
+  }
+
+  const source = fs.readFileSync(generatedPath, 'utf-8');
+  const components = new Set<string>();
+  const functions = new Set<string>();
+
+  const compBlock = source.match(/export const includedComponents\s*=\s*\{([^}]*)\}/s);
+  if (compBlock?.[1]) {
+    for (const m of compBlock[1].matchAll(/^\s+(\w+)\s*:/gm)) {
+      if (m[1]) components.add(m[1]);
+    }
+  }
+
+  const fnBlock = source.match(/export const includedFunctions\s*=\s*\{([^}]*)\}/s);
+  if (fnBlock?.[1]) {
+    for (const m of fnBlock[1].matchAll(/^\s+(\w+)\s*:/gm)) {
+      if (m[1]) functions.add(m[1]);
+    }
+  }
+
+  return { components, functions };
+}
+
+/**
  * Extract exported names from a TypeScript source file using a simple regex.
  * Matches: export function Foo, export const Foo, export class Foo, export { Foo }
  */
@@ -240,7 +272,7 @@ function checkMandatoryFunctions(srcPath: string, isOk: boolean): boolean {
   let ok = isOk;
 
   const indexPath = path.join(srcPath, 'index.ts');
-  const functionsPath = path.join(srcPath, 'functions.ts');
+  const functionsPath = path.join(srcPath, 'functions', 'functions.ts');
 
   const indexSource = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf-8') : '';
   const functionsSource = fs.existsSync(functionsPath) ? fs.readFileSync(functionsPath, 'utf-8') : '';
@@ -267,6 +299,14 @@ function checkMandatoryFunctions(srcPath: string, isOk: boolean): boolean {
     }
   }
 
+  // If includedFunctions is spread, resolve names from generated-includes.ts
+  if (/includedFunctions/.test(combined)) {
+    const included = extractIncludedNames(srcPath);
+    for (const name of included.functions) {
+      allKnown.add(name);
+    }
+  }
+
   for (const fn of MANDATORY_FUNCTIONS) {
     if (!allKnown.has(fn)) {
       console.error(
@@ -281,6 +321,12 @@ function checkMandatoryFunctions(srcPath: string, isOk: boolean): boolean {
 
 function validateCatalog(config: CatalogConfig): boolean {
   console.log(`🔍 Validating: ${config.name}`);
+
+  if (!config.jsonFile) {
+    console.error(`   ❌ Catalog JSON not found — run 'freesail prepare catalog' first.`);
+    return false;
+  }
+
   let isOk = true;
 
   // 1. Parse catalog JSON
@@ -383,10 +429,10 @@ function validateCatalog(config: CatalogConfig): boolean {
     }
   }
 
-  const componentsPath = path.join(config.srcPath, 'components.tsx');
+  const componentsPath = path.join(config.srcPath, 'components', 'components.tsx');
   if (jsonComponents.length > 0) {
     if (!fs.existsSync(componentsPath)) {
-      console.error(`   ❌ Missing components.tsx`);
+      console.error(`   ❌ Missing components/components.tsx`);
       isOk = false;
     } else {
       const componentSource = fs.readFileSync(componentsPath, 'utf-8');
@@ -420,6 +466,11 @@ function validateCatalog(config: CatalogConfig): boolean {
           }
         }
       }
+      // If includedComponents is spread into the map, resolve from generated-includes.ts
+      if (/includedComponents/.test(componentSource)) {
+        const included = extractIncludedNames(config.srcPath);
+        for (const name of included.components) { allKnown.add(name); }
+      }
       const missing = jsonComponents.filter((c) => !allKnown.has(c));
       if (missing.length > 0) {
         console.error(`   ❌ Unimplemented components: ${missing.join(', ')}`);
@@ -436,11 +487,11 @@ function validateCatalog(config: CatalogConfig): boolean {
       ? Object.keys(rawFunctions)
       : [];
 
-  const functionsPath = path.join(config.srcPath, 'functions.ts');
+  const functionsPath = path.join(config.srcPath, 'functions', 'functions.ts');
 
   if (jsonFunctions.length > 0) {
     if (!fs.existsSync(functionsPath)) {
-      console.error(`   ❌ Missing functions.ts`);
+      console.error(`   ❌ Missing functions/functions.ts`);
       isOk = false;
     } else {
       const fnSource = fs.readFileSync(functionsPath, 'utf-8');
@@ -472,6 +523,11 @@ function validateCatalog(config: CatalogConfig): boolean {
           }
         }
       }
+      // If includedFunctions is spread into the map, resolve from generated-includes.ts
+      if (/includedFunctions/.test(fnSource)) {
+        const included = extractIncludedNames(config.srcPath);
+        for (const name of included.functions) { allKnown.add(name); }
+      }
       const missing = jsonFunctions.filter((f) => !allKnown.has(f));
       if (missing.length > 0) {
         console.error(`   ❌ Unimplemented functions: ${missing.join(', ')}`);
@@ -502,28 +558,23 @@ function validateCatalog(config: CatalogConfig): boolean {
 
 export function run(): void {
   console.log('--- Freesail Catalog Validate ---');
-  const catalogs = discoverCatalogs();
+
+  const dirArg = parseDirArg();
+  const targetDir = dirArg ? path.resolve(process.cwd(), dirArg) : CWD;
+
+  if (dirArg && !fs.existsSync(path.join(targetDir, 'src', 'includes', 'catalog.include.json'))) {
+    console.error(`❌ Not a catalog directory: ${targetDir}`);
+    console.error('   Expected src/includes/catalog.include.json to be present.');
+    process.exit(1);
+  }
+
+  const catalogs = discoverCatalogs(targetDir);
 
   if (catalogs.length === 0) {
-    // Check if decomposed source files exist (user needs to run prepare first)
-    const srcPath = path.join(CWD, 'src');
-    const hasCommonDir =
-      fs.existsSync(path.join(srcPath, 'common')) ||
-      fs.existsSync(path.join(CWD, 'common'));
-    const hasComponentFiles = fs.existsSync(srcPath) &&
-      fs.readdirSync(srcPath).some(f => f === 'components.json');
-
-    if (hasCommonDir || hasComponentFiles) {
-      console.error(
-        '❌ No resolved catalog JSON found, but decomposed source files detected.\n' +
-          '   Run `freesail prepare catalog` first to generate the catalog JSON.'
-      );
-    } else {
-      console.error(
-        '❌ No catalogs found. Run this command from a catalog package directory\n' +
-          '   (folder must be named {prefix}_catalog or contain src/{prefix}_catalog.json).'
-      );
-    }
+    console.error(
+      '❌ No catalog found. Run from a catalog directory\n' +
+        '   (must contain src/includes/catalog.include.json), or use --dir <path>.'
+    );
     process.exit(1);
   }
 

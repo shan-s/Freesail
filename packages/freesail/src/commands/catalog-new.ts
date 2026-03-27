@@ -1,21 +1,25 @@
 /**
  * @fileoverview freesail new catalog
  *
- * Scaffolds a new Freesail catalog package using the fork-and-own model.
+ * Scaffolds a new Freesail catalog package using the inclusion model.
  *
- * Common files (components, functions, types) are copied from
- * the bundled catalog/ directory into the new catalog's src/common/ folder.
- * The developer owns all files and can modify them freely.
+ * Instead of copying a common/ directory, the developer declares which
+ * components and functions they want to include from existing catalog packages
+ * via catalog.include.json. `freesail prepare catalog` then bundles the
+ * schema and generates generated-includes.ts for React implementations.
  *
  * After scaffolding, `freesail prepare catalog` is run to generate the
- * resolved catalog JSON from common + custom schema files.
+ * resolved catalog JSON and the generated-includes.ts bridge file.
  */
 
 import fs from 'fs';
 import path from 'path';
 import { createInterface } from 'readline';
-import { prepareCatalog } from './catalog-prepare.js';
+import { createRequire } from 'module';
+import { pathToFileURL } from 'url';
+import { prepareCatalog, buildCatalogConfig } from './catalog-prepare.js';
 import readmeTemplate from './catalog-readme.md';
+import newDefaults from './catalog-new-defaults.json';
 
 // ---------------------------------------------------------------------------
 // Catalog domain generation
@@ -35,7 +39,7 @@ function generateCatalogDomain(): string {
  * name (no scope) → falls back to the provided fallback domain
  */
 function domainFromPackageName(packageName: string, fallback: string): string {
-  const match = packageName.match(/^@([^/]+)\//); 
+  const match = packageName.match(/^@([^/]+)\//);
   return match ? `${match[1]}.local` : fallback;
 }
 
@@ -53,25 +57,28 @@ function ask(rl: ReturnType<typeof createInterface>, question: string, defaultVa
 }
 
 /**
- * Locate the bundled catalog directory shipped with the freesail CLI.
+ * Try to load a catalog JSON from an installed package.
+ * Returns the parsed JSON if successful, or null if the package is not installed.
+ * Resolution is anchored to CWD so workspace-linked packages are found.
  */
-function findCatalogDir(): string {
-  return path.join(__dirname, 'catalog');
-}
-
-/**
- * Read a common source file from the bundled catalog/ directory.
- */
-function readCommonFile(catalogDir: string, filename: string): string {
-  const filePath = path.join(catalogDir, filename);
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Common file not found: ${filePath}`);
+function tryLoadPackageCatalog(
+  packageName: string,
+  catalogPath: string,
+): Record<string, unknown> | null {
+  try {
+    const require = createRequire(pathToFileURL(path.join(process.cwd(), '_')).href);
+    const pkgJsonPath = require.resolve(`${packageName}/package.json`);
+    const pkgRoot = path.dirname(pkgJsonPath);
+    const fullPath = path.join(pkgRoot, catalogPath);
+    if (!fs.existsSync(fullPath)) return null;
+    return JSON.parse(fs.readFileSync(fullPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return null;
   }
-  return fs.readFileSync(filePath, 'utf-8');
 }
 
 // ---------------------------------------------------------------------------
-// Scaffold generation
+// Scaffold file generators
 // ---------------------------------------------------------------------------
 
 function generateComponentsTsx(prefix: string): string {
@@ -81,33 +88,24 @@ function generateComponentsTsx(prefix: string): string {
   return `/**
  * @fileoverview ${pascalPrefix} Catalog Components
  *
- * Extends the common component set with catalog-specific components.
+ * Extends included components with catalog-specific custom components.
+ * Edit catalog.include.json to add or remove included packages/components,
+ * then run \`freesail prepare catalog\` to regenerate generated-includes.ts.
  */
 
-import React, { useState, useEffect, type CSSProperties } from 'react';
+import React, { type CSSProperties } from 'react';
 import type { FreesailComponentProps } from '@freesail/react';
-import type { FunctionCall } from '@freesail/core';
-import { commonComponents } from './common/CommonComponents.js';
-import {
-  getSemanticColor,
-  getSemanticBackground,
-  mapJustify,
-  toInputFormat,
-  validateChecks,
-} from './common/common-utils.js';
-import { commonFunctions } from './common/CommonFunctions.js';
+import { includedComponents } from '../includes/generated-includes.js';
 
 // Add custom components here, for example:
 //
 // export function MyWidget({ component, children }: FreesailComponentProps) {
-//   const style: CSSProperties = {
-//     color: getSemanticColor(component['color'] as string),
-//   };
+//   const style: CSSProperties = {};
 //   return <div style={style}>{children}</div>;
 // }
 
 export const ${camelPrefix}CatalogComponents: Record<string, React.ComponentType<FreesailComponentProps>> = {
-  ...commonComponents,
+  ...includedComponents,
   // MyWidget,
 };
 `;
@@ -119,11 +117,13 @@ function generateFunctionsTs(prefix: string): string {
   return `/**
  * @fileoverview ${camelPrefix} Catalog Functions
  *
- * Re-exports all common functions. Add catalog-specific functions below.
+ * Extends included functions with catalog-specific custom functions.
+ * Edit catalog.include.json to add or remove included packages/functions,
+ * then run \`freesail prepare catalog\` to regenerate generated-includes.ts.
  */
 
 import type { FunctionImplementation } from '@freesail/react';
-import { commonFunctions } from './common/CommonFunctions.js';
+import { includedFunctions } from '../includes/generated-includes.js';
 
 // Add custom functions here, for example:
 //
@@ -132,7 +132,7 @@ import { commonFunctions } from './common/CommonFunctions.js';
 // };
 
 export const ${camelPrefix}CatalogFunctions: Record<string, FunctionImplementation> = {
-  ...commonFunctions,
+  ...includedFunctions,
   // myCustomFn,
 };
 `;
@@ -148,9 +148,9 @@ function generateIndexTs(prefix: string): string {
  */
 
 import type { CatalogDefinition } from '@freesail/react';
-import { ${camelPrefix}CatalogComponents } from './components.js';
-import { ${camelPrefix}CatalogFunctions } from './functions.js';
-import catalogSchema from './${prefix}_catalog.json';
+import { ${camelPrefix}CatalogComponents } from './components/components.js';
+import { ${camelPrefix}CatalogFunctions } from './functions/functions.js';
+import catalogSchema from './${prefix}-catalog.json';
 
 export const ${constName}: CatalogDefinition = {
   namespace: catalogSchema.catalogId,
@@ -161,70 +161,17 @@ export const ${constName}: CatalogDefinition = {
 `;
 }
 
-function generatePackageJson(
-  packageName: string,
-  prefix: string,
-  title: string,
-  description: string,
-): string {
+function generatePackageJson(packageName: string, prefix: string): string {
   const pkg = {
     name: packageName,
-    version: '0.1.0',
     description: `Freesail ${prefix} catalog`,
-    type: 'module',
-    main: './dist/index.js',
-    types: './dist/index.d.ts',
-    exports: {
-      '.': {
-        types: './dist/index.d.ts',
-        import: './dist/index.js',
-      },
-    },
-    files: ['dist', 'src/schemas', 'LICENSE'],
-    scripts: {
-      'prepare:catalog': 'freesail prepare catalog',
-      build: 'tsc',
-      dev: 'tsc --watch',
-      clean: 'rm -rf dist *.tsbuildinfo',
-      prebuild: 'freesail prepare catalog && freesail validate catalog',
-    },
-    peerDependencies: {
-      '@freesail/react': '*',
-      react: '^18.0.0 || ^19.0.0',
-    },
-    devDependencies: {
-      '@freesail/react': '*',
-      '@types/react': '^18.2.0',
-      react: '^18.2.0',
-      freesail: '*',
-    },
-    license: 'MIT',
+    ...newDefaults.packageJson,
   };
-
   return JSON.stringify(pkg, null, 2);
 }
 
 function generateTsconfig(): string {
-  const config = {
-    compilerOptions: {
-      target: 'ES2022',
-      module: 'ESNext',
-      moduleResolution: 'bundler',
-      lib: ['ES2022', 'DOM', 'DOM.Iterable'],
-      declaration: true,
-      outDir: './dist',
-      rootDir: './src',
-      strict: true,
-      esModuleInterop: true,
-      skipLibCheck: true,
-      jsx: 'react-jsx',
-      resolveJsonModule: true,
-      isolatedModules: true,
-    },
-    include: ['src'],
-  };
-
-  return JSON.stringify(config, null, 2);
+  return JSON.stringify(newDefaults.tsconfig, null, 2);
 }
 
 function generateReadme(prefix: string, title: string, description: string): string {
@@ -251,7 +198,7 @@ function parseDirArg(): string | undefined {
 
 export async function run(): Promise<void> {
   console.log('--- Freesail New Catalog ---\n');
-  console.log('This will scaffold a new catalog. Common components and functions will be copied into your catalog.\n');
+  console.log('This will scaffold a new Freesail catalog package.\n');
 
   const dirArg = parseDirArg();
 
@@ -264,7 +211,6 @@ export async function run(): Promise<void> {
       process.exit(1);
     }
 
-    // Validate prefix: lowercase, underscores allowed, no spaces
     if (!/^[a-z][a-z0-9_]*$/.test(prefix)) {
       console.error('Prefix must start with a lowercase letter and contain only [a-z0-9_].');
       process.exit(1);
@@ -275,14 +221,18 @@ export async function run(): Promise<void> {
     const title = await ask(rl, 'Catalog title', `${prefix.charAt(0).toUpperCase() + prefix.slice(1)} Catalog`);
     const description = await ask(rl, 'Catalog description', `A custom Freesail catalog for ${prefix}`);
     const packageName = await ask(rl, 'npm package name', `@${domain}/${prefix}_catalog`);
-    const outputDir = dirArg ?? await ask(rl, 'Output directory', `./${prefix}_catalog`);
+    const outputDir = dirArg ?? await ask(rl, 'Output directory', `./${prefix}-catalog`);
     if (dirArg) console.log(`Output directory: ${outputDir}`);
 
-    // Derive catalogId from the package org scope (e.g. @sloop-3f2a1c → sloop-3f2a1c.local)
-    const catalogDomain = domainFromPackageName(packageName, domain);
-    const catalogId = `https://${catalogDomain}/catalogs/${prefix}_catalog_v1.json`;
-
     rl.close();
+
+    const { standardCatalog } = newDefaults;
+    const standardCatalogInstalled =
+      tryLoadPackageCatalog(standardCatalog.package, standardCatalog.catalogPath) !== null;
+
+    // Derive catalogId from the package org scope
+    const catalogDomain = domainFromPackageName(packageName, domain);
+    const catalogId = `https://${catalogDomain}/catalogs/${prefix.replace(/_/g, '-')}-catalog.json`;
 
     // Resolve output path
     const outPath = path.resolve(process.cwd(), outputDir);
@@ -293,52 +243,64 @@ export async function run(): Promise<void> {
       process.exit(1);
     }
 
-    // Find bundled catalog common source files
-    const catalogDir = findCatalogDir();
-    if (!fs.existsSync(catalogDir)) {
-      console.error(
-        '\n❌ Cannot find bundled catalog directory.\n' +
-        '   Reinstall the freesail package.'
-      );
-      process.exit(1);
-    }
-
     console.log('\n📦 Scaffolding catalog...\n');
 
-    // Create directories
-    const commonPath = path.join(srcPath, 'common');
-    fs.mkdirSync(commonPath, { recursive: true });
+    // Create src/ subdirectories
+    fs.mkdirSync(path.join(srcPath, 'includes'), { recursive: true });
+    fs.mkdirSync(path.join(srcPath, 'components'), { recursive: true });
+    fs.mkdirSync(path.join(srcPath, 'functions'), { recursive: true });
 
-    // Copy common source files into src/common/
-    const filesToCopy = ['CommonComponents.tsx', 'CommonFunctions.ts', 'common_types.json', 'common_components.json', 'common_functions.json'];
-    for (const file of filesToCopy) {
-      const content = readCommonFile(catalogDir, file);
-      fs.writeFileSync(path.join(commonPath, file), content);
-      console.log(`   📄 src/common/${file}`);
+    // Generate src/includes/catalog.include.json
+    const includeJson = {
+      includes: {
+        [standardCatalog.package]: {
+          catalogPath: standardCatalog.catalogPath,
+          components: standardCatalog.components,
+          functions: standardCatalog.functions,
+          defs: standardCatalog.defs,
+        },
+      },
+    };
+    if (!standardCatalogInstalled) {
+      console.warn(`   ⚠  ${standardCatalog.package} is not installed.`);
+      console.warn(`      Run: npm install ${standardCatalog.package}`);
+      console.warn('      Then: freesail prepare catalog');
     }
 
-    // Generate empty custom schema stubs
-    fs.writeFileSync(path.join(srcPath, 'components.json'), JSON.stringify({ components: {} }, null, 2) + '\n');
-    console.log('   📄 src/components.json');
+    fs.writeFileSync(
+      path.join(srcPath, 'includes', 'catalog.include.json'),
+      JSON.stringify(includeJson, null, 2) + '\n',
+    );
+    console.log('   📄 src/includes/catalog.include.json');
 
-    fs.writeFileSync(path.join(srcPath, 'functions.json'), JSON.stringify({ functions: {} }, null, 2) + '\n');
-    console.log('   📄 src/functions.json');
+    // Generate component schema and implementation stubs
+    fs.writeFileSync(
+      path.join(srcPath, 'components', 'components.json'),
+      JSON.stringify({ components: {} }, null, 2) + '\n',
+    );
+    console.log('   📄 src/components/components.json');
 
-    fs.writeFileSync(path.join(srcPath, 'catalog.exclude.json'), JSON.stringify({ components: [], functions: [] }, null, 2) + '\n');
-    console.log('   📄 src/catalog.exclude.json');
+    fs.writeFileSync(path.join(srcPath, 'components', 'components.tsx'), generateComponentsTsx(prefix));
+    console.log('   📄 src/components/components.tsx');
 
-    // Generate TypeScript files
-    fs.writeFileSync(path.join(srcPath, 'components.tsx'), generateComponentsTsx(prefix));
-    console.log('   📄 src/components.tsx');
+    // Generate function schema and implementation stubs
+    fs.writeFileSync(
+      path.join(srcPath, 'functions', 'functions.json'),
+      JSON.stringify({ functions: {} }, null, 2) + '\n',
+    );
+    console.log('   📄 src/functions/functions.json');
 
-    fs.writeFileSync(path.join(srcPath, 'functions.ts'), generateFunctionsTs(prefix));
-    console.log('   📄 src/functions.ts');
+    fs.writeFileSync(path.join(srcPath, 'functions', 'functions.ts'), generateFunctionsTs(prefix));
+    console.log('   📄 src/functions/functions.ts');
 
     fs.writeFileSync(path.join(srcPath, 'index.ts'), generateIndexTs(prefix));
     console.log('   📄 src/index.ts');
 
     // Generate package files
-    fs.writeFileSync(path.join(outPath, 'package.json'), generatePackageJson(packageName, prefix, title, description));
+    fs.writeFileSync(
+      path.join(outPath, 'package.json'),
+      generatePackageJson(packageName, prefix),
+    );
     console.log('   📄 package.json');
 
     fs.writeFileSync(path.join(outPath, 'tsconfig.json'), generateTsconfig());
@@ -347,25 +309,30 @@ export async function run(): Promise<void> {
     fs.writeFileSync(path.join(outPath, 'README.md'), generateReadme(prefix, title, description));
     console.log('   📄 README.md');
 
-    // Generate resolved catalog JSON via prepare
-    console.log('');
-    prepareCatalog({
-      name: `${prefix}_catalog`,
-      packagePath: outPath,
-      srcPath,
-      prefix,
-    });
+    // Run catalog-prepare to generate the initial catalog JSON and generated-includes.ts.
+    // Skip if @freesail/standard-catalog is not yet installed — prepare would fail.
+    const canPrepare = standardCatalogInstalled;
+    if (canPrepare) {
+      console.log('');
+      prepareCatalog(buildCatalogConfig(outPath, srcPath));
+    }
 
     console.log(`\n✅ Catalog scaffolded at: ${outPath}`);
     console.log('\nNext steps:');
     console.log(`  cd ${outputDir}`);
-    console.log('  npm install');
+    if (!canPrepare) {
+      console.log('  npm install @freesail/standard-catalog');
+      console.log('  npx freesail prepare catalog');
+    } else {
+      console.log('  npm install');
+    }
     console.log('  npm run build');
     console.log('\nAdd custom components in src/components.tsx');
-    console.log(`  and define their schemas in src/components.json`);
+    console.log('  and define their schemas in src/components.json');
     console.log('Add custom functions in src/functions.ts');
-    console.log(`  and define their schemas in src/functions.json`);
-    console.log('\nAfter schema changes, run: npx freesail prepare catalog');
+    console.log('  and define their schemas in src/functions.json');
+    console.log('\nTo import components/functions from a catalog package, run:');
+    console.log('  npx freesail import catalog --package <name>');
     console.log('\n⚠  Update the package scope (e.g. @myorg) before publishing.');
   } finally {
     rl.close();

@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@freesail-community/weathercatalog": "*",
-    "@freesail/catalogs": "*",
+    "@freesail/standard-catalog": "*",
+    "@freesail/chat-catalog": "*",
     "@freesail/react": "*",
     "freesail": "*",
     "react": "^18.2.0",

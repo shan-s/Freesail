@@ -5,10 +5,9 @@
  *
  * Usage:
  *   freesail validate catalog  — validate an existing catalog package
- *   freesail prepare catalog   — generate catalog.json from decomposed schema files
+ *   freesail prepare catalog   — bundle catalog.json from catalog.include.json + local schemas
  *   freesail run gateway       — start the Freesail gateway server
  *   freesail new catalog       — scaffold a new catalog package
- *   freesail update catalog    — update common files in an existing catalog
  */
 
 const args = process.argv.slice(2);
@@ -22,13 +21,18 @@ function printHelp(): void {
   console.log('');
   console.log('Commands:');
   console.log('  new catalog       Scaffold a new catalog package');
-  console.log('  update catalog    Update common files in an existing catalog');
-  console.log('  prepare catalog   Generate catalog.json from decomposed schema files');
+  console.log('  import catalog    Add a package to catalog.include.json and re-prepare');
+  console.log('  prepare catalog   Bundle catalog.json from catalog.include.json + local schemas');
   console.log('  validate catalog  Validate an existing catalog package');
   console.log('  run gateway       Start the Freesail gateway server');
   console.log('');
-  console.log('Options (new catalog, update catalog):');
+  console.log('Options (new catalog):');
   console.log('  --dir, -d <path>          Target directory');
+  console.log('');
+  console.log('Options (import catalog):');
+  console.log('  --dir, -d <path>          Catalog root directory (default: current directory)');
+  console.log('  --package, -p <name>      Package to import from');
+  console.log('  --catalog-path <path>     Path to catalog JSON within the package');
   console.log('');
   console.log('Options (run gateway):');
   console.log('  --http-port <port>        Port for the HTTP/SSE server (default: 3001)');
@@ -79,12 +83,12 @@ if (verb === 'validate') {
     console.error('Usage: freesail new catalog');
     process.exit(1);
   }
-} else if (verb === 'update') {
+} else if (verb === 'import') {
   if (noun === 'catalog') {
-    import('./commands/catalog-update.js').then((m) => m.run());
+    import('./commands/catalog-import.js').then((m) => m.run());
   } else {
-    console.error(`Unknown target for update: ${noun ?? '(none)'}`);
-    console.error('Usage: freesail update catalog');
+    console.error(`Unknown target for import: ${noun ?? '(none)'}`);
+    console.error('Usage: freesail import catalog');
     process.exit(1);
   }
 } else {

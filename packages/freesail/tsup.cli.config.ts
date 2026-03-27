@@ -27,7 +27,7 @@ export default defineConfig([
     banner: {
       js: '#!/usr/bin/env node',
     },
-    external: ['@freesail/core', '@freesail/react', '@freesail/gateway', '@freesail/catalogs'],
+    external: ['@freesail/core', '@freesail/react', '@freesail/gateway', '@freesail/standard-catalog'],
     onSuccess: async () => {
       copyCatalogFiles();
       console.log('CLI ✅ Copied catalog files to dist/catalog/');
