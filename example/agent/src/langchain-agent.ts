@@ -101,8 +101,8 @@ export class FreesailLangchainSessionAgent implements FreesailAgent {
 
     const { event: action } = notification;
 
-    // Route chat_send on __chat surface → conversational reply (always starts a new turn)
-    if (action.name === 'chat_send' && action.surfaceId === '__chat') {
+    // Route usr_msg on __chat surface → conversational reply (always starts a new turn)
+    if (action.name === 'usr_msg' && action.surfaceId === '__chat') {
       const chatText = (action.context as { text?: string })?.text;
       if (chatText) {
         await this.handleChat(chatText, true);

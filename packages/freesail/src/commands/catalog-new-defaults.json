@@ -1,64 +1,130 @@
 {
-  "standardCatalog": {
-    "package": "@freesail/standard-catalog",
-    "catalogPath": "dist/standard-catalog.json",
-    "components": ["Card"],
-    "functions": ["formatString"],
-    "defs": ["ComponentCommon", "DynamicString", "ChildList", "DynamicBoolean"]
+  "standardCatalogPackages": {
+    "react": {
+      "package": "@freesail/standard-catalog",
+      "catalogPath": "dist/standard-catalog.json",
+      "components": ["Card"],
+      "functions": ["formatString"],
+      "defs": ["ComponentCommon", "DynamicString", "ChildList", "DynamicBoolean"]
+    },
+    "lit": {
+      "package": "@freesail/standard-catalog-lit",
+      "catalogPath": "dist/standard-catalog.json",
+      "components": ["Card"],
+      "functions": ["formatString"],
+      "defs": ["ComponentCommon", "DynamicString", "ChildList", "DynamicBoolean"]
+    }
   },
-  "packageJson": {
-    "version": "0.1.0",
-    "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-      ".": {
+  "frameworks": {
+    "react": {
+      "packageJson": {
+        "version": "0.1.0",
+        "type": "module",
+        "main": "./dist/index.js",
         "types": "./dist/index.d.ts",
-        "import": "./dist/index.js"
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": ["dist", "src/schemas", "LICENSE", "3rdpartylicenses.txt"],
+        "scripts": {
+          "prepare:catalog": "freesail prepare catalog",
+          "build": "tsc",
+          "postbuild": "cp src/freesailconfig.json dist/ && cp src/*-catalog.json dist/",
+          "dev": "tsc --watch",
+          "clean": "rm -rf dist *.tsbuildinfo",
+          "prebuild": "freesail prepare catalog && freesail validate catalog"
+        },
+        "peerDependencies": {
+          "@freesail/standard-catalog": "0.4.6",
+          "@freesail/react": "0.4.6",
+          "react": "^18.0.0 || ^19.0.0",
+          "react-dom": "^18.0.0 || ^19.0.0"
+        },
+        "devDependencies": {
+          "@freesail/standard-catalog": "0.4.6",
+          "@freesail/react": "0.4.6",
+          "@types/react": "^18.0.0 || ^19.0.0",
+          "react": "^18.0.0 || ^19.0.0",
+          "react-dom": "^18.0.0 || ^19.0.0",
+          "freesail": "0.4.6"
+        },
+        "license": "MIT"
       },
-      "./package.json": "./package.json"
+      "tsconfig": {
+        "compilerOptions": {
+          "target": "ES2022",
+          "module": "ESNext",
+          "moduleResolution": "bundler",
+          "lib": ["ES2022", "DOM", "DOM.Iterable"],
+          "declaration": true,
+          "outDir": "./dist",
+          "rootDir": "./src",
+          "strict": true,
+          "esModuleInterop": true,
+          "skipLibCheck": true,
+          "jsx": "react-jsx",
+          "resolveJsonModule": true,
+          "isolatedModules": true
+        },
+        "include": ["src"]
+      }
     },
-    "files": ["dist", "src/schemas", "LICENSE", "3rdpartylicenses.txt"],
-    "scripts": {
-      "prepare:catalog": "freesail prepare catalog",
-      "build": "tsc",
-      "postbuild": "cp src/freesailconfig.json dist/ && cp src/*-catalog.json dist/",
-      "dev": "tsc --watch",
-      "clean": "rm -rf dist *.tsbuildinfo",
-      "prebuild": "freesail prepare catalog && freesail validate catalog"
-    },
-    "peerDependencies": {
-      "@freesail/standard-catalog": "0.4.6",
-      "@freesail/react": "0.4.6",
-      "react": "^18.0.0 || ^19.0.0",
-      "react-dom": "^18.0.0 || ^19.0.0"
-    },
-    "devDependencies": {
-      "@freesail/standard-catalog": "0.4.6",
-      "@freesail/react": "0.4.6",
-      "@types/react": "^18.0.0 || ^19.0.0",
-      "react": "^18.0.0 || ^19.0.0",
-      "react-dom": "^18.0.0 || ^19.0.0",
-      "freesail": "0.4.6"
-    },
-    "license": "MIT"
-  },
-  "tsconfig": {
-    "compilerOptions": {
-      "target": "ES2022",
-      "module": "ESNext",
-      "moduleResolution": "bundler",
-      "lib": ["ES2022", "DOM", "DOM.Iterable"],
-      "declaration": true,
-      "outDir": "./dist",
-      "rootDir": "./src",
-      "strict": true,
-      "esModuleInterop": true,
-      "skipLibCheck": true,
-      "jsx": "react-jsx",
-      "resolveJsonModule": true,
-      "isolatedModules": true
-    },
-    "include": ["src"]
+    "lit": {
+      "packageJson": {
+        "version": "0.1.0",
+        "type": "module",
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "files": ["dist", "src/schemas", "LICENSE", "3rdpartylicenses.txt"],
+        "scripts": {
+          "prepare:catalog": "freesail prepare catalog",
+          "build": "tsc",
+          "postbuild": "cp src/freesailconfig.json dist/ && cp src/*-catalog.json dist/",
+          "dev": "tsc --watch",
+          "clean": "rm -rf dist *.tsbuildinfo",
+          "prebuild": "freesail prepare catalog && freesail validate catalog"
+        },
+        "peerDependencies": {
+          "@freesail/standard-catalog-lit": "0.4.6",
+          "@freesail/lit": "0.4.6",
+          "lit": "^3.0.0"
+        },
+        "devDependencies": {
+          "@freesail/standard-catalog-lit": "0.4.6",
+          "@freesail/lit": "0.4.6",
+          "lit": "^3.0.0",
+          "freesail": "0.4.6"
+        },
+        "license": "MIT"
+      },
+      "tsconfig": {
+        "compilerOptions": {
+          "target": "ES2022",
+          "module": "ESNext",
+          "moduleResolution": "bundler",
+          "lib": ["ES2022", "DOM", "DOM.Iterable"],
+          "declaration": true,
+          "outDir": "./dist",
+          "rootDir": "./src",
+          "strict": true,
+          "esModuleInterop": true,
+          "skipLibCheck": true,
+          "resolveJsonModule": true,
+          "isolatedModules": true
+        },
+        "include": ["src"]
+      }
+    }
   }
 }

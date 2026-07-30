@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest *)",
+      "Bash(npm view *)",
+      "Bash(xargs -I{} echo {})",
+      "Bash(xargs cat)"
+    ]
+  }
+}

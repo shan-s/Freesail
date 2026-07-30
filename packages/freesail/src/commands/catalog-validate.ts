@@ -54,6 +54,8 @@ interface CatalogConfig {
   catalogId?: string;
   title?: string;
   description?: string;
+  /** Which renderer the catalog's components are implemented for. Defaults to 'react' for catalogs predating this field. */
+  framework: 'react' | 'lit';
 }
 
 
@@ -72,8 +74,9 @@ function buildConfigFromEntry(packageDir: string, entry: Record<string, unknown>
   const prefix = name.replace(/[-_]catalog$/, '').replace(/-/g, '_');
   const absJsonPath = path.join(srcPath, catalogFile);
   const jsonFile = fs.existsSync(absJsonPath) ? catalogFile : null;
+  const framework = entry['framework'] === 'lit' ? 'lit' : 'react';
   return {
-    name, packagePath: packageDir, srcPath, jsonFile, prefix,
+    name, packagePath: packageDir, srcPath, jsonFile, prefix, framework,
     catalogId: entry['catalogId'] as string | undefined,
     title: entry['title'] as string | undefined,
     description: entry['description'] as string | undefined,
@@ -429,10 +432,11 @@ function validateCatalog(config: CatalogConfig): boolean {
     }
   }
 
-  const componentsPath = path.join(config.srcPath, 'components', 'components.tsx');
+  const componentsFileName = config.framework === 'lit' ? 'components.ts' : 'components.tsx';
+  const componentsPath = path.join(config.srcPath, 'components', componentsFileName);
   if (jsonComponents.length > 0) {
     if (!fs.existsSync(componentsPath)) {
-      console.error(`   ❌ Missing components/components.tsx`);
+      console.error(`   ❌ Missing components/${componentsFileName}`);
       isOk = false;
     } else {
       const componentSource = fs.readFileSync(componentsPath, 'utf-8');

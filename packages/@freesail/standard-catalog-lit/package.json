@@ -1,0 +1,67 @@
+{
+  "name": "@freesail/standard-catalog-lit",
+  "version": "0.9.4",
+  "description": "Standard UI Component Catalog for Freesail A2UI SDK (Lit implementation) - provides a collection of commonly used UI components to build agent-driven UIs with Lit / Web Components.",
+  "homepage": "https://www.freesail.ai",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src/schemas",
+    "LICENSE",
+    "3rdpartylicenses.txt",
+    "README.md"
+  ],
+  "scripts": {
+    "prepare:catalog": "freesail prepare catalog",
+    "build": "tsc",
+    "postbuild": "cp src/freesailconfig.json dist/ && cp src/standard-catalog.json dist/",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prebuild": "vitest run && freesail prepare catalog && freesail validate catalog && node ../../../scripts/check-catalog-schema-parity.js"
+  },
+  "keywords": [
+    "a2ui",
+    "freesail",
+    "agent-driven ui",
+    "generative ui",
+    "ai agent",
+    "lit",
+    "web components"
+  ],
+  "peerDependencies": {
+    "@freesail/lit": "^0.9.4",
+    "lit": "^3.0.0"
+  },
+  "devDependencies": {
+    "@freesail/lit": "^0.9.4",
+    "lit": "^3.2.0",
+    "vitest": "^4.0.18"
+  },
+  "author": {
+    "name": "Thendral AI Ltd",
+    "email": "support@thendral.ai",
+    "url": "https://www.thendral.ai"
+  },
+  "contributors": [
+    "Shanmugam Sudalaimuthu"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

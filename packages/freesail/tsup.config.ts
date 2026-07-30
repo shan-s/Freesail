@@ -21,7 +21,7 @@ export default defineConfig([
     format: ['cjs', 'esm'],
     dts: true,
     clean: true,
-    external: ['react', 'react-dom', 'react/jsx-runtime', '@freesail/core', '@freesail/react', '@freesail/standard-catalog'],
+    external: ['react', 'react-dom', 'react/jsx-runtime', 'lit', '@freesail/core', '@freesail/react', '@freesail/lit', '@freesail/standard-catalog'],
   },
   // CLI build — CJS only, with shebang banner
   {
@@ -35,7 +35,7 @@ export default defineConfig([
     banner: {
       js: '#!/usr/bin/env node',
     },
-    external: ['@freesail/core', '@freesail/react', '@freesail/gateway', '@freesail/standard-catalog'],
+    external: ['@freesail/core', '@freesail/react', '@freesail/lit', '@freesail/gateway', '@freesail/standard-catalog'],
     onSuccess: async () => {
       copyCatalogFiles();
       console.log('CLI ✅ Copied catalog files to dist/catalog/');

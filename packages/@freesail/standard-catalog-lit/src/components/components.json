@@ -1,0 +1,1558 @@
+{
+  "components": {
+    "Text": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders text content. Key properties: text (required), variant (h1/h2/h3/h4/h5/caption/body), size (CSS font-size), weight (CSS font-weight), color (CSS color). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Text"
+            },
+            "text": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The text content to display. While simple Markdown formatting is supported (i.e. without HTML, images, or links), utilizing dedicated UI components is generally preferred for a richer and more structured presentation."
+            },
+            "variant": {
+              "type": "string",
+              "description": "A hint for the base text style.",
+              "enum": [
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "h5",
+                "caption",
+                "body"
+              ]
+            },
+            "size": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "CSS font-size for the text (e.g. '12px', '1.2rem', '2em'). Overrides the size implied by variant."
+            },
+            "fontWeight": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "CSS font-weight (e.g. 'normal', 'bold', '500', '700'). Overrides the weight implied by variant."
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "CSS color for the text (e.g. '#ef4444', 'red', 'var(--freesail-primary)'). Defaults to inherited color."
+            }
+          },
+          "required": [
+            "component",
+            "text"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Icon": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Displays a Material Design icon. Key properties: name (required, a Material Icon name in camelCase). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Icon"
+            },
+            "name": {
+              "description": "A Material Symbols icon name in camelCase (e.g. 'home', 'search', 'settings', 'accountCircle', 'shoppingCart', 'mail', 'phone', 'star', 'language'). IMPORTANT: Material Symbols does NOT include brand or social media icons — 'facebook', 'twitter', 'instagram', 'linkedin', 'youtube' and similar are invalid and will render as broken text. For social media links, use a Button with variant 'borderless' and a text label instead.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "size": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "CSS size for the icon (e.g. '12px', '1.2rem', '2em')."
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "CSS color for the icon (e.g. '#ef4444', 'red', 'var(--freesail-primary)'). Defaults to inherited color."
+            }
+          },
+          "required": [
+            "component",
+            "name"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Row": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A layout component that arranges its children horizontally. To create a grid layout, nest Columns within this Row. Key properties: children (required), gap (spacing between children, default '8px'), padding, justify (start/center/end/spaceBetween/spaceAround/spaceEvenly/stretch), align (start/center/end/stretch; controls vertical alignment). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Row"
+            },
+            "children": {
+              "description": "Defines the children. Use an array of strings for a fixed set of children, or a template object to generate children from a data list. Children cannot be defined inline, they must be referred to by ID.",
+              "$ref": "../common/common_types.json#/$defs/ChildList"
+            },
+            "gap": {
+              "description": "Spacing between children. Use semantic words: \"none\", \"sm\" / \"small\", \"md\" / \"medium\", \"lg\" / \"large\", \"xl\". Also accepts any valid CSS length (e.g. \"16px\").",
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "default": "sm"
+            },
+            "padding": {
+              "description": "Padding around the content.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString"
+            },
+            "justify": {
+              "type": "string",
+              "description": "Defines the arrangement of children along the main axis (horizontally). Use 'spaceBetween' to push items to the edges, or 'start'/'end'/'center' to pack them together.",
+              "enum": [
+                "center",
+                "end",
+                "spaceAround",
+                "spaceBetween",
+                "spaceEvenly",
+                "start",
+                "stretch"
+              ]
+            },
+            "align": {
+              "type": "string",
+              "description": "Defines the alignment of children along the cross axis (vertically). Use 'center' to vertically center items of the same height. Use 'end' when mixing labeled inputs (TextField, Dropdown) with unlabeled components (Button) — aligns bottom edges so the button lines up with the input fields rather than the center of the label+input block.",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "stretch"
+              ]
+            },
+            "wrap": {
+              "type": "string",
+              "description": "Defines whether items should wrap to a new line if they exceed the container width.",
+              "enum": [
+                "nowrap",
+                "wrap",
+                "wrap-reverse"
+              ]
+            },
+            "theme": {
+              "$ref": "../common/common_types.json#/$defs/Theme",
+              "description": "Theme token overrides cascading to all children of this layout container. Useful for scoping a color scheme to a section of the UI. Token-to-element mapping: bg → sets BOTH the container's own background color AND the background of any flat Card children inside (IMPORTANT: always set bg when you want a colored section background, e.g. a hero or banner — do NOT set color on individual Text children instead); bgRaised → background of raised Card children; textForeground → text color inherited by all Text components inside (use this alongside bg for hero sections so text is readable); primary → brand/accent color for Button and icon children; border → border color for Divider and TabularGrid children. Example for a dark hero section: { \"bg\": \"#1a2a4a\", \"textForeground\": \"#ffffff\" }"
+            }
+          },
+          "required": [
+            "component",
+            "children"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Column": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A layout component that arranges its children vertically. To create a grid layout, nest Rows within this Column. Key properties: children (required), gap (spacing between children, default '8px'), padding, justify (start/center/end/spaceBetween/spaceAround/spaceEvenly/stretch), align (start/center/end/stretch; controls horizontal alignment of children; default is 'start'; set to 'stretch' for list layouts where children should fill the full width). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Column"
+            },
+            "children": {
+              "description": "Defines the children. Use an array of strings for a fixed set of children, or a template object to generate children from a data list. Children cannot be defined inline, they must be referred to by ID.",
+              "$ref": "../common/common_types.json#/$defs/ChildList"
+            },
+            "gap": {
+              "description": "Spacing between children. Use semantic words: \"none\", \"sm\" / \"small\", \"md\" / \"medium\", \"lg\" / \"large\", \"xl\". Also accepts any valid CSS length (e.g. \"16px\").",
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "default": "sm"
+            },
+            "padding": {
+              "description": "Padding around the content.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString"
+            },
+            "justify": {
+              "type": "string",
+              "description": "Defines the arrangement of children along the main axis (vertically). Use 'spaceBetween' to push items to the edges (e.g. header at top, footer at bottom), or 'start'/'end'/'center' to pack them together.",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "spaceBetween",
+                "spaceAround",
+                "spaceEvenly",
+                "stretch"
+              ]
+            },
+            "align": {
+              "type": "string",
+              "description": "Defines the alignment of children along the cross axis (horizontally). This is similar to the CSS 'align-items' property.",
+              "enum": [
+                "center",
+                "end",
+                "start",
+                "stretch"
+              ]
+            },
+            "theme": {
+              "$ref": "../common/common_types.json#/$defs/Theme",
+              "description": "Theme token overrides cascading to all children of this layout container. Useful for scoping a color scheme to a section of the UI. Token-to-element mapping: bg → sets BOTH the container's own background color AND the background of any flat Card children inside (IMPORTANT: always set bg when you want a colored section background, e.g. a hero or banner — do NOT set color on individual Text children instead); bgRaised → background of raised Card children; textForeground → text color inherited by all Text components inside (use this alongside bg for hero sections so text is readable); primary → brand/accent color for Button and icon children; border → border color for Divider and TabularGrid children. Example for a dark hero section: { \"bg\": \"#1a2a4a\", \"textForeground\": \"#ffffff\" }"
+            }
+          },
+          "required": [
+            "component",
+            "children"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Card": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A styled container with border and optional shadow. Two variants: 'raised' (default, elevated look with shadow and rounded corners) and 'flat' (no shadow, square corners, background matches the main surface). To make cards stretch to fill their parent's width, either set width to '100%' on the Card, or set align to 'stretch' on the parent Column. Key properties: child (required), variant ('raised'|'flat'), borderWeight (border thickness in px, default 1, 0 removes border), padding, width, height, align ('start'|'center'|'end'|'stretch', aligns children horizontally), justify ('start'|'center'|'end'|'between'|'around', distributes children vertically), zoomable. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Card"
+            },
+            "variant": {
+              "type": "string",
+              "enum": ["raised", "flat"],
+              "default": "raised",
+              "description": "Visual style of the card. 'raised' (default) has a shadow and rounded corners on an elevated background. 'flat' has no shadow, square corners, and blends with the main surface background."
+            },
+            "borderWeight": {
+              "type": "number",
+              "minimum": 0,
+              "default": 1,
+              "description": "Border thickness in pixels. Default is 1. Set to 0 to remove the border entirely."
+            },
+            "padding": {
+              "description": "Padding inside the card.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "default": "16px"
+            },
+            "align": {
+              "type": "string",
+              "enum": ["start", "center", "end", "stretch"],
+              "description": "Cross-axis alignment of children inside the card. 'stretch' (default) makes children fill the full card width. 'start' aligns children to the left, 'center' centers them horizontally, 'end' aligns them to the right."
+            },
+            "justify": {
+              "type": "string",
+              "enum": ["start", "center", "end", "between", "around"],
+              "description": "Main-axis (vertical) distribution of children inside the card. 'start' (default) stacks from the top, 'center' centers vertically, 'end' aligns to the bottom."
+            },
+            "zoomable": {
+              "type": "boolean",
+              "description": "When true, a small toggle button appears in the top-right corner of the card. Clicking it opens the card in a centered modal overlay at 70% of the viewport width (max 1200px, max 90vh tall); clicking outside or the button again restores it. Set it to true when the card contains content that benefits from a larger view, such as charts. "
+            },
+            "child": {
+              "$ref": "../common/common_types.json#/$defs/ComponentId",
+              "description": "The ID of the single child component to be rendered inside the card. To display multiple elements, you MUST wrap them in a layout component (like Column or Row) and pass that container's ID here. Do NOT pass multiple IDs or a non-existent ID. Do NOT define the child component inline."
+            },
+            "theme": {
+              "$ref": "../common/common_types.json#/$defs/Theme",
+              "description": "Theme token overrides for this card and all content inside it. Token-to-element mapping: bgRaised → card background when variant is 'raised' (default); bg → card background when variant is 'flat'; textForeground → primary text color inside the card; textSecondary → secondary/muted text inside the card; border → card border color; primary → accent color for primary buttons or icons inside. Example: { \"bgRaised\": \"#1e3a5f\", \"textForeground\": \"#ffffff\" }"
+            }
+          },
+          "required": [
+            "component",
+            "child"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Modal": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A modal window that overlays the screen. IMPORTANT: The Modal must be added to a parent layout's children array (e.g. the root Column) to render. It renders as a fixed overlay so its position in the tree does not affect layout. You can set visibility at client side using the show/hide functions. To open the modal, use a Button whose action calls the show function with the modal's ID. Key properties: child (required, ID of the component shown inside the modal). The Modal includes a 'X' button for closing. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Modal"
+            },
+            "child": {
+              "$ref": "../common/common_types.json#/$defs/ComponentId",
+              "description": "The ID of the component to be displayed inside the modal. Do NOT define the component inline."
+            },
+            "theme": {
+              "$ref": "../common/common_types.json#/$defs/Theme",
+              "description": "Theme token overrides scoped to the modal panel and all content inside it. Token-to-element mapping: bgRaised → modal panel background; textForeground → modal title and body text; border → modal border and internal dividers; primary → primary action button color inside the modal. Example: { \"bgRaised\": \"#0f172a\", \"textForeground\": \"#f8fafc\" }"
+            }
+          },
+          "required": [
+            "component",
+            "child"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Button": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A clickable button that triggers an action. Key properties: action (required), label (text for the button), child (ID of a child component, e.g. Icon), variant (primary/secondary/outline/borderless/danger; default is 'primary' which uses the theme's primary color). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Button"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The text label for the button. Used if 'child' is not provided."
+            },
+            "child": {
+              "$ref": "../common/common_types.json#/$defs/ComponentId",
+              "description": "The ID of the child component. Use a 'Text' component for a labeled button. Only use an 'Icon' if the requirements explicitly ask for an icon-only button. Do NOT define the child component inline."
+            },
+            "variant": {
+              "type": "string",
+              "description": "A hint for the button style. If omitted, a default button style is used.",
+              "enum": [
+                "primary",
+                "secondary",
+                "outline",
+                "borderless",
+                "danger"
+              ],
+              "default": "primary"
+            },
+            "action": {
+              "$ref": "../common/common_types.json#/$defs/Action"
+            }
+          },
+          "required": [
+            "component",
+            "action"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "TextField": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A text input field for user input. Key properties: value (data binding for the input's value), variant (shortText/longText/number/obscured), label (optional \u2014 shows above the input in stacked Column forms; omit for inline Row forms and use placeholder instead), placeholder (hint text inside the input), min/max (numeric bounds, only used when variant is 'number'). User-Writable: true.",
+          "properties": {
+            "component": {
+              "const": "TextField"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Optional label shown above the input. Use in stacked Column forms where persistent field identification is needed. Omit in inline Row forms \u2014 use placeholder instead."
+            },
+            "placeholder": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Hint text shown inside the input when empty. Use as the primary affordance in inline Row forms. Independent of label."
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The value of the text field."
+            },
+            "variant": {
+              "type": "string",
+              "description": "The type of input field to display.",
+              "enum": [
+                "longText",
+                "number",
+                "shortText",
+                "obscured"
+              ]
+            },
+            "min": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Minimum allowed value. Only used when variant is 'number'."
+            },
+            "max": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Maximum allowed value. Only used when variant is 'number'."
+            }
+          },
+          "required": [
+            "component",
+            "placeholder"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ChoicePickerSingleSelect": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A component that allows selecting exactly one option from a list of options. User-Writable: true.",
+          "properties": {
+            "component": {
+              "const": "ChoicePickerSingleSelect"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The label for the group of options."
+            },
+            "variant": {
+              "type": "string",
+              "description": "How the choice picker should be displayed - a group of radio buttons or chips.",
+              "enum": [
+                "radio",
+                "chips"
+              ]
+            },
+            "options": {
+              "description": "The list of available options to choose from. Can be a literal array or a data binding to a list in the data model.",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "description": "The text to display for this option.",
+                        "$ref": "../common/common_types.json#/$defs/DynamicString"
+                      },
+                      "value": {
+                        "type": "string",
+                        "description": "The stable value associated with this option."
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The currently selected value. This should be bound to a string in the data model."
+            }
+          },
+          "required": [
+            "component",
+            "options",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ChoicePickerMultiSelect": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A component that allows selecting one or more options from a list of options. User-Writable: true.",
+          "properties": {
+            "component": {
+              "const": "ChoicePickerMultiSelect"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The label for the group of options."
+            },
+            "variant": {
+              "type": "string",
+              "description": "How the choice picker should be displayed - a group of checkboxes or chips.",
+              "enum": [
+                "checkbox",
+                "chips"
+              ]
+            },
+            "options": {
+              "description": "The list of available options to choose from. Can be a literal array or a data binding to a list in the data model.",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "description": "The text to display for this option.",
+                        "$ref": "../common/common_types.json#/$defs/DynamicString"
+                      },
+                      "value": {
+                        "type": "string",
+                        "description": "The stable value associated with this option."
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicStringList",
+              "description": "The list of currently selected values. This should be bound to a string array in the data model."
+            }
+          },
+          "required": [
+            "component",
+            "options",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "DateInput": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A date picker input. Supports single date or date-range (from/to) selection. Emits ISO 8601 date strings — no time component. For time selection, use a TimeInput component separately. User-Writable: true.",
+          "properties": {
+            "component": {
+              "const": "DateInput"
+            },
+            "mode": {
+              "type": "string",
+              "enum": ["single", "range"],
+              "description": "Selection mode. \"single\" (default) — one date; \"range\" — two dates (from and to)."
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicStringList",
+              "description": "Array of ISO 8601 date strings (\"YYYY-MM-DD\") bound to the data model. For mode \"single\": one element [\"YYYY-MM-DD\"]. For mode \"range\": one element while the user is picking the start, two elements [\"YYYY-MM-DD\", \"YYYY-MM-DD\"] once the range is complete. Always use a DataBinding — initialise to [] in the data model."
+            },
+            "min": {
+              "allOf": [
+                {
+                  "$ref": "../common/common_types.json#/$defs/DynamicString"
+                },
+                {
+                  "if": {
+                    "type": "string"
+                  },
+                  "then": {
+                    "oneOf": [
+                      {
+                        "format": "date"
+                      },
+                      {
+                        "format": "time"
+                      },
+                      {
+                        "format": "date-time"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "description": "The earliest selectable date in ISO 8601 format (\"YYYY-MM-DD\")."
+            },
+            "max": {
+              "allOf": [
+                {
+                  "$ref": "../common/common_types.json#/$defs/DynamicString"
+                },
+                {
+                  "if": {
+                    "type": "string"
+                  },
+                  "then": {
+                    "oneOf": [
+                      {
+                        "format": "date"
+                      },
+                      {
+                        "format": "time"
+                      },
+                      {
+                        "format": "date-time"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "description": "The latest selectable date in ISO 8601 format (\"YYYY-MM-DD\")."
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The text label for the input field."
+            }
+          },
+          "required": [
+            "component",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "TimeInput": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A standalone time picker input with hour/minute spinners. Use this alongside a DateInput (date-only) when you need separate date and time controls — e.g., one date field plus separate start-time and end-time fields. User-Writable: true.",
+          "properties": {
+            "component": {
+              "const": "TimeInput"
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicStringList",
+              "description": "Single-element array holding the selected time as \"HH:MM\" in 24-hour format (e.g. [\"14:30\"]). Always use a DataBinding — the path should hold a string array in the data model, initialised to []."
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The text label displayed above the spinner."
+            },
+            "timeStep": {
+              "oneOf": [
+                { "type": "number", "minimum": 1, "maximum": 60 },
+                { "$ref": "../common/common_types.json#/$defs/DataBinding" }
+              ],
+              "description": "Minute increment for the minute spinner (default 1). Use 15 or 30 for slot-based time selection."
+            },
+            "timeFormat": {
+              "oneOf": [
+                { "type": "string", "enum": ["24h", "12h"] },
+                { "$ref": "../common/common_types.json#/$defs/DataBinding" }
+              ],
+              "description": "Display format: \"24h\" (default, 00–23) or \"12h\" (1–12 with AM/PM toggle)."
+            }
+          },
+          "required": [
+            "component",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Spacer": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "An empty space component used for layout and spacing. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Spacer"
+            }
+          },
+          "required": [
+            "component"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Image": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Displays an image. Key properties: url (required), fit (contain/cover/fill/none/scale-down), variant (icon/avatar/smallFeature/mediumFeature/largeFeature/header). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Image"
+            },
+            "url": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The URL of the image to display."
+            },
+            "fit": {
+              "type": "string",
+              "description": "Specifies how the image should be resized to fit its container. This corresponds to the CSS 'object-fit' property.",
+              "enum": [
+                "contain",
+                "cover",
+                "fill",
+                "none",
+                "scale-down"
+              ]
+            },
+            "variant": {
+              "type": "string",
+              "description": "A hint for the image size and style.",
+              "enum": [
+                "icon",
+                "avatar",
+                "smallFeature",
+                "mediumFeature",
+                "largeFeature",
+                "header"
+              ]
+            }
+          },
+          "required": [
+            "component",
+            "url"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Video": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Plays a video. Key properties: url (required), embed (set to true for YouTube/Vimeo URLs). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Video"
+            },
+            "url": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The URL of the video to display."
+            },
+            "embed": {
+              "type": "boolean",
+              "description": "When true, the video is rendered inside an iframe. This MUST be set to true for third-party sources such as YouTube (youtube.com, youtu.be) and Vimeo (vimeo.com). When false or omitted, a native video player is used, which only works with direct video file URLs (e.g. .mp4, .webm).",
+              "default": false
+            }
+          },
+          "required": [
+            "component",
+            "url"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "AudioPlayer": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "An audio player that supports direct audio file URLs and embedded third-party players (e.g. Spotify, SoundCloud). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "AudioPlayer"
+            },
+            "url": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The URL of the audio to be played."
+            },
+            "description": {
+              "description": "A description of the audio, such as a title or summary.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString"
+            },
+            "embed": {
+              "type": "boolean",
+              "description": "When true, the audio is rendered inside an iframe embed player. This MUST be set to true for third-party sources such as Spotify (open.spotify.com) and SoundCloud (soundcloud.com). When false or omitted, a native audio player is used, which only works with direct audio file URLs (e.g. .mp3, .wav).",
+              "default": false
+            }
+          },
+          "required": [
+            "component",
+            "url"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "List": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A scrollable list that lays out children vertically or horizontally, with optional alignment control. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "List"
+            },
+            "children": {
+              "description": "Defines the children. Use an array of strings for a fixed set of children, or a template object to generate children from a data list.",
+              "$ref": "../common/common_types.json#/$defs/ChildList"
+            },
+            "direction": {
+              "type": "string",
+              "description": "The direction in which the list items are laid out.",
+              "enum": [
+                "vertical",
+                "horizontal"
+              ]
+            },
+            "align": {
+              "type": "string",
+              "description": "Defines the alignment of children along the cross axis.",
+              "enum": [
+                "start",
+                "center",
+                "end",
+                "stretch"
+              ]
+            }
+          },
+          "required": [
+            "component",
+            "children"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "TabGroup": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A tabbed container that shows one Tab child at a time. Children must be Tab components. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "TabGroup"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "../common/common_types.json#/$defs/ComponentId"
+              },
+              "description": "Array of Tab component IDs. Do NOT define components inline."
+            }
+          },
+          "required": [
+            "component",
+            "children"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Tab": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A single tab within a TabGroup. Has a title and a child component. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Tab"
+            },
+            "title": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The tab title displayed in the tab bar."
+            },
+            "child": {
+              "$ref": "../common/common_types.json#/$defs/ComponentId",
+              "description": "The ID of the child component. Do NOT define the component inline."
+            }
+          },
+          "required": [
+            "component",
+            "title",
+            "child"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Divider": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A visual separator line. Key properties: axis (horizontal/vertical, default horizontal). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Divider"
+            },
+            "axis": {
+              "type": "string",
+              "description": "The orientation of the divider.",
+              "enum": [
+                "horizontal",
+                "vertical"
+              ],
+              "default": "horizontal"
+            }
+          },
+          "required": [
+            "component"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Dropdown": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A dropdown (select) component for choosing a single option from a list. User-Writable: true.",
+          "properties": {
+            "component": {
+              "const": "Dropdown"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Optional label shown above the dropdown. Use in stacked Column forms. Omit in inline Row forms or inside a TabularGrid \u2014 the context already communicates the field purpose."
+            },
+            "placeholder": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Hint text shown as the first disabled option when nothing is selected. Defaults to 'Select an option'."
+            },
+            "options": {
+              "description": "The list of available options to choose from. Can be a literal array or a data binding to a list in the data model.",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "description": "The text to display for this option.",
+                        "$ref": "../common/common_types.json#/$defs/DynamicString"
+                      },
+                      "value": {
+                        "type": "string",
+                        "description": "The stable value associated with this option."
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The currently selected value. This should be bound to a string in the data model."
+            }
+          },
+          "required": [
+            "component",
+            "options",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "CheckBox": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A checkbox toggle for boolean values. Key properties: label (required), value (required, data binding for the checked state). User-Writable: true.",
+          "properties": {
+            "component": {
+              "const": "CheckBox"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The text to display next to the checkbox."
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "The current state of the checkbox (true for checked, false for unchecked)."
+            }
+          },
+          "required": [
+            "component",
+            "label",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Slider": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "$ref": "../common/common_types.json#/$defs/Checkable"
+        },
+        {
+          "type": "object",
+          "description": "A slider for selecting a numeric value within a range, or a range slider with multiple thumbs. Key properties: value (required), min (required), max (required), label, step. For a single thumb pass a number or DataBinding returning a number. For multi-thumb pass an array of numbers (e.g. [20, 80]) — the path binding should hold a number array. User-Writable: true.",
+          "properties": {
+            "component": {
+              "const": "Slider"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The label for the slider."
+            },
+            "min": {
+              "type": "number",
+              "description": "The minimum value of the slider."
+            },
+            "max": {
+              "type": "number",
+              "description": "The maximum value of the slider."
+            },
+            "step": {
+              "type": "number",
+              "description": "The step increment. Defaults to 1."
+            },
+            "value": {
+              "description": "The current value(s) of the slider. Pass a single number (or DataBinding returning a number) for one thumb. Pass an array of numbers for a range/multi-thumb slider — the bound path should hold a number array.",
+              "oneOf": [
+                { "$ref": "../common/common_types.json#/$defs/DynamicNumber" },
+                {
+                  "type": "array",
+                  "items": { "type": "number" },
+                  "minItems": 2,
+                  "maxItems": 4
+                }
+              ]
+            }
+          },
+          "required": [
+            "component",
+            "value",
+            "min",
+            "max"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "FluidGrid": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A responsive auto-fill grid that flows children into equal-width columns. Each column is at least minItemWidth wide; the browser fills as many columns as fit. Use for card galleries, icon grids, and any layout where items should wrap responsively. Key properties: minItemWidth (minimum column width, default '200px'), gap (space between items). User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "FluidGrid"
+            },
+            "children": {
+              "description": "Defines the item content. Use a template object { componentId, path } to generate items from a data list, or an array of component IDs for static children.",
+              "$ref": "../common/common_types.json#/$defs/ChildList"
+            },
+            "minItemWidth": {
+              "description": "Minimum width of each auto-fill column. Defaults to '200px'. Use CSS length values e.g. '160px', '12rem'.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "default": "200px"
+            },
+            "gap": {
+              "description": "Gap between grid items. Defaults to var(--freesail-space-sm, 8px). Use CSS length or spacing token.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString"
+            }
+          },
+          "required": [
+            "component",
+            "children"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "TabularGrid": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "A fixed-column grid with optional header row and styled alternating rows. Use columns to set a fixed column count without headers (e.g. a chess board). Use headers to render a header row \u2014 its length takes precedence over columns. Collapses to a single column on narrow containers (< 480px). Compose row content using Row and Text components via the children template. IMPORTANT: Row padding is controlled by rowPadding on the TabularGrid, not by padding on the child Row components. IMPORTANT: When placing TextField or Dropdown components inside a TabularGrid, always set hideLabel: true on each one. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "TabularGrid"
+            },
+            "columns": {
+              "type": "number",
+              "description": "Fixed column count. Required when headers is absent. Ignored when headers is provided (header length takes precedence)."
+            },
+            "headers": {
+              "type": "array",
+              "items": {
+                "$ref": "../common/common_types.json#/$defs/DynamicString"
+              },
+              "description": "Column header labels. When provided, renders a header row and its length sets the column count. Optional \u2014 omit when using columns instead."
+            },
+            "children": {
+              "description": "Defines the row/item content. Use a template object { componentId, path } to generate items from a data list, or an array of component IDs for static children.",
+              "$ref": "../common/common_types.json#/$defs/ChildList"
+            },
+            "columnWeights": {
+              "type": "array",
+              "items": { "type": "number" },
+              "description": "Fractional width weights per column. Length must match column count. Defaults to equal sizing."
+            },
+            "showGridLines": {
+              "type": "boolean",
+              "description": "When true (default), draws a 1px border-bottom separator between rows. Set to false for grids where per-cell backgrounds provide the visual structure (e.g. a chess board with per-cell background props).",
+              "default": true
+            },
+            "showBorder": {
+              "type": "boolean",
+              "description": "When true (default), wraps the grid in a 1px solid border with rounded corners. Set to false to remove the border.",
+              "default": true
+            },
+            "theme": {
+              "$ref": "../common/common_types.json#/$defs/Theme",
+              "description": "Theme token overrides for this grid and all descendants. Token-to-element mapping: bgMuted → header row background; bgRaised → odd data row background; bg → even data row background; textSecondary → header label text color; textForeground → data cell text color; border → row separators and outer border. Example: { \"bgMuted\": \"#1e3a5f\", \"bgRaised\": \"#1e3a5f\", \"bg\": \"#162d4a\", \"textForeground\": \"#ffffff\", \"border\": \"#2d5a8e\" }"
+            },
+            "rowPadding": {
+              "description": "CSS padding applied to every cell in each data row. Defaults to '10px 16px'.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "default": "10px 16px"
+            },
+            "gap": {
+              "description": "Gap between grid items. Use CSS length or spacing token.",
+              "$ref": "../common/common_types.json#/$defs/DynamicString"
+            }
+          },
+          "required": [
+            "component",
+            "children"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "BarChart": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a bar chart from an array of data points. Each data point has a label and value. The chart auto-scales to fit. Use orientation 'horizontal' for long labels or many categories. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "BarChart"
+            },
+            "title": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Optional chart title displayed above the chart."
+            },
+            "data": {
+              "description": "Array of data points. Each item has a 'label' (string) and 'value' (number), and optionally a 'color' (CSS color string) to override the default bar color for that item.",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      },
+                      "color": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ]
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "orientation": {
+              "type": "string",
+              "description": "Bar direction. 'vertical' = bars grow upward, 'horizontal' = bars grow rightward.",
+              "enum": [
+                "vertical",
+                "horizontal"
+              ],
+              "default": "vertical"
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Default bar color (CSS). Individual data items can override with their own 'color'."
+            },
+            "showValues": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "Whether to display the numeric value on each bar.",
+              "default": true
+            },
+            "chartHeight": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Chart height in pixels.",
+              "default": 300
+            }
+          },
+          "required": [
+            "component",
+            "data"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "LineChart": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a line chart from an array of data points. Supports optional area fill and data point dots. Good for showing trends over time. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "LineChart"
+            },
+            "title": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Optional chart title displayed above the chart."
+            },
+            "data": {
+              "description": "Array of data points. Each item has a 'label' (string) and 'value' (number).",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ]
+                  },
+                  "minItems": 2
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Line color (CSS).",
+              "default": "#2563eb"
+            },
+            "showDots": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "Whether to show data point circles on the line.",
+              "default": true
+            },
+            "showArea": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "Whether to fill the area under the line with a translucent gradient.",
+              "default": false
+            },
+            "chartHeight": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Chart height in pixels.",
+              "default": 300
+            }
+          },
+          "required": [
+            "component",
+            "data"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "PieChart": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a pie or donut chart from an array of segments. Each segment has a label and value. Colors are auto-assigned if not provided. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "PieChart"
+            },
+            "title": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Optional chart title displayed above the chart."
+            },
+            "data": {
+              "description": "Array of segments. Each item has a 'label' (string) and 'value' (number), and optionally a 'color' (CSS color string).",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      },
+                      "color": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "value"
+                    ]
+                  },
+                  "minItems": 1
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "donut": {
+              "$ref": "../common/common_types.json#/$defs/DynamicBoolean",
+              "description": "If true, renders as a donut chart with a hollow center.",
+              "default": false
+            },
+            "size": {
+              "$ref": "../common/common_types.json#/$defs/DynamicNumber",
+              "description": "Chart diameter in pixels.",
+              "default": 250
+            },
+            "align": {
+              "type": "string",
+              "enum": ["start", "center", "end"],
+              "description": "Horizontal alignment of the chart within its container. Default is 'start' (left-aligned)."
+            }
+          },
+          "required": [
+            "component",
+            "data"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Sparkline": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a compact inline sparkline chart from an array of numbers. Use inside StatCard or alongside text to show a quick trend. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "Sparkline"
+            },
+            "values": {
+              "description": "Array of numeric values representing the trend data.",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2
+                },
+                {
+                  "$ref": "../common/common_types.json#/$defs/DataBinding"
+                }
+              ]
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Line color (CSS).",
+              "default": "#2563eb"
+            }
+          },
+          "required": [
+            "component",
+            "values"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "StatCard": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "../common/common_types.json#/$defs/ComponentCommon"
+        },
+        {
+          "type": "object",
+          "description": "Renders a KPI / summary statistic card with a large value, label, and optional trend indicator. Use multiple StatCards in a Row to create a dashboard header. User-Writable: false.",
+          "properties": {
+            "component": {
+              "const": "StatCard"
+            },
+            "label": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The metric label (e.g. 'Total Revenue', 'Active Users')."
+            },
+            "value": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The formatted display value (e.g. '$12,340', '1.2k', '98%'). Use formatNumber or formatCurrency to produce this."
+            },
+            "trend": {
+              "type": "string",
+              "description": "Direction of the trend arrow.",
+              "enum": [
+                "up",
+                "down",
+                "neutral"
+              ]
+            },
+            "trendColor": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Color of the trend arrow."
+            },
+            "trendValue": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "The trend change text shown next to the arrow (e.g. '+12%', '-3.2%')."
+            },
+            "color": {
+              "$ref": "../common/common_types.json#/$defs/DynamicString",
+              "description": "Accent color for the card's left border and icon."
+            },
+            "children": {
+              "$ref": "../common/common_types.json#/$defs/ChildList",
+              "description": "Optional children rendered below the stat value (e.g. a Sparkline)."
+            }
+          },
+          "required": [
+            "component",
+            "label",
+            "value"
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

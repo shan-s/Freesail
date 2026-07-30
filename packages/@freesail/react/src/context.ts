@@ -5,35 +5,13 @@
  */
 
 import { createContext, useContext } from 'react';
-import type {
-  SurfaceManager,
-  A2UITransport,
-  Surface,
-  SurfaceId,
-  ComponentId,
-  A2UIClientDataModel,
-} from '@freesail/core';
+import type { FreesailContextValue } from '@freesail/core';
 
 /**
  * Freesail context value.
+ * Shape is shared across every renderer package — see @freesail/core.
  */
-export interface FreesailContextValue {
-  /** Surface manager instance */
-  surfaceManager: SurfaceManager;
-  /** Transport instance (may be null if not connected) */
-  transport: A2UITransport | null;
-  /** Send an action (v0.9 format) */
-  sendAction: (
-    surfaceId: SurfaceId,
-    name: string,
-    sourceComponentId: ComponentId,
-    context: Record<string, unknown>
-  ) => Promise<void>;
-  /** Get a surface by ID */
-  getSurface: (surfaceId: SurfaceId) => Surface | undefined;
-  /** Connection state */
-  isConnected: boolean;
-}
+export type { FreesailContextValue };
 
 /**
  * React context for Freesail.

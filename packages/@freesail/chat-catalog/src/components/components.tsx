@@ -282,7 +282,7 @@ function SendIcon() {
 
 /**
  * Chat input field with send button.
- * Fires a 'chat_send' action with context { text: string }.
+ * Fires a 'usr_msg' action with context { text: string }.
  */
 export function ChatInput({ component, onAction }: FreesailComponentProps) {
   const placeholder = (component['placeholder'] as string) ?? 'Type a message...';
@@ -297,7 +297,7 @@ export function ChatInput({ component, onAction }: FreesailComponentProps) {
     setText('');
     chatContext?.addOptimisticMessage(trimmed);
     if (onAction) {
-      onAction('chat_send', { text: trimmed });
+      onAction('usr_msg', { text: trimmed });
     }
   };
 

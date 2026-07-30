@@ -6,5 +6,6 @@ export * as Core from '@freesail/core'; // Also provide namespace for power user
 
 // 2. Framework-specific UI logic (Namespaced)
 export * as ReactUI from '@freesail/react';
+export * as LitUI from '@freesail/lit';
 
 

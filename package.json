@@ -6,10 +6,11 @@
   "scripts": {
     "clean": "npm run clean --workspaces --if-present",
     "sync": "node scripts/sync-versions.js",
-    "build:core": "npm run build -w @freesail/logger && npm run build -w @freesail/core && npm run build -w @freesail/react",
+    "verify:catalog-parity": "node scripts/check-catalog-schema-parity.js",
+    "build:core": "npm run build -w @freesail/logger && npm run build -w @freesail/core && npm run build -w @freesail/react && npm run build -w @freesail/lit",
     "build:cli": "npm run build:cli -w freesail",
     "build:sdk": "npm run build -w freesail && npm run build -w @freesail/gateway && npm run build -w @freesail/agent-runtime",
-    "build:catalogs": "npm run build -w @freesail/standard-catalog && npm run build -w @freesail/chat-catalog && npm run build -w @freesail-community/weather-catalog",
+    "build:catalogs": "npm run build -w @freesail/standard-catalog && npm run build -w @freesail/standard-catalog-lit && npm run build -w @freesail/chat-catalog && npm run build -w @freesail-community/weather-catalog",
     "build": "npm run sync && npm run build:core && npm run build:cli && npm run build:catalogs && npm run build:sdk",
     "clean:publish": "rm -rf publish && mkdir publish",
     "pack:all": "npm run clean:publish && npm run pack:packages",
@@ -32,7 +33,8 @@
     "packages/@freesail-community/*",
     "packages/freesail",
     "example/agent",
-    "example/react-app"
+    "example/react-app",
+    "example/lit-app"
   ],
   "engines": {
     "node": ">=20.0.0"

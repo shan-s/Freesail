@@ -87,3 +87,53 @@ export { SurfaceManager, createSurfaceManager } from './surface.js';
 
 // Logger
 export type { Logger, LogFn } from './logger.js';
+
+// Data path resolution
+export { getDataAtPath } from './data-path.js';
+
+// Component metadata
+export { ComponentMeta } from './component-meta.js';
+
+// Generic component registry (shared by every renderer package)
+export {
+  ComponentRegistry,
+  type ComponentMap,
+  type FunctionLookup,
+  type FunctionImplementation,
+} from './registry.js';
+
+// Framework-agnostic binding/evaluation engine (shared by every renderer package)
+export {
+  extractMeta,
+  isDataBindingObject,
+  resolveSingleBinding,
+  resolveDataBindings,
+  evaluateFunction,
+  resolveActionContext,
+  interpolateTemplate,
+} from './binding-engine.js';
+
+// Side effects (catalog function helpers)
+export {
+  type FreesailSideEffect,
+  isFreesailSideEffect,
+  dispatchAction,
+  setComponentState,
+} from './side-effects.js';
+
+// Theming (framework-agnostic design tokens + CSS custom property conversion)
+export {
+  type FreesailThemeMode,
+  type FreesailThemeTokens,
+  type FreesailSurfaceTheme,
+  type FreesailThemeProp,
+  type CssVarMap,
+  defaultLightTokens,
+  defaultDarkTokens,
+  resolveTokens,
+  tokensToCssVars,
+  surfaceThemeToCssVars,
+} from './theme-utils.js';
+
+// Shared renderer-context value shape
+export type { FreesailContextValue } from './context-types.js';
