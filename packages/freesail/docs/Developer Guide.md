@@ -10,14 +10,14 @@ Freesail uses a **Triangle Pattern** with three independent processes:
 
 ```
 ┌────────────────┐    MCP Streamable HTTP     ┌──────────────────┐    A2UI SSE   ┌──────────────┐
-│   AI Agent     │  ◄────────────────────────►│ Freesail Gateway │ ◄───────────► │ React App    │
+│   AI Agent     │  ◄────────────────────────►│ Freesail Gateway │ ◄───────────► │ Frontend App │
 │  (Orchestrator)│      Port 3000             │    (Bridge)      │   Port 3001   │ (Renderer)   │
 └────────────────┘    localhost only          └──────────────────┘               └──────────────┘
 ```
 
 - **Agent**: Decides *what* to show by calling MCP tools (e.g., `create_surface`, `update_components`).
 - **Gateway**: Translates between MCP (agent-facing) and A2UI (UI-facing). Validates agent output against catalog schemas.
-- **Frontend**: Renders A2UI JSON into React components and sends user actions back to the agent.
+- **Frontend**: Renders A2UI JSON into UI components and sends user actions back to the agent. Two renderers ship today — **React** (§3, `@freesail/react`) and **Lit** / Web Components (§3b, `@freesail/lit`). Pick one per app; a catalog package targets one renderer, but the same agent can drive either, since the catalog *schema* is renderer-agnostic.
 
 ---
 
@@ -185,6 +185,8 @@ freesail run gateway --log-filter session.agent-surface:debug
 
 ## 3. Setting Up the React Application
 
+> Using Lit instead? Skip to [§3b](#3b-setting-up-the-lit-application) — same concepts (provider, surfaces, theming), different API surface.
+
 ### Install the SDK
 
 ```bash
@@ -273,6 +275,111 @@ function MainLayout() {
 |------|--------|-----------------|-------------------|
 | **Agent-managed** | Alphanumeric (e.g., `workspace`) | Agent via `create_surface` | Full control |
 | **Client-managed** | Starts with `__` (e.g., `__chat`) | React app | `updateDataModel` only |
+
+---
+
+## 3b. Setting Up the Lit Application
+
+`@freesail/lit` provides the same connection/surface/theming machinery as `@freesail/react`, as standard custom elements instead of React components — no framework runtime beyond Lit itself.
+
+### Install the SDK
+
+```bash
+npm install @freesail/lit @freesail/standard-catalog-lit lit
+```
+
+### Configure `<freesail-provider>`
+
+`<freesail-provider>` manages the gateway connection, catalog registration, and theming — the direct equivalent of `FreesailProvider`. Register it once (side-effect import) so the custom elements exist, then set catalogs and theme **imperatively as properties**, not as HTML attributes — arrays and objects can't be expressed as attribute strings.
+
+```ts
+import '@freesail/lit'; // registers <freesail-provider> and <freesail-surface>
+import { StandardCatalog } from '@freesail/standard-catalog-lit';
+import type { CatalogDefinition } from '@freesail/lit';
+
+const CATALOGS: CatalogDefinition[] = [StandardCatalog];
+
+const provider = document.querySelector('freesail-provider')!;
+provider.catalogs = CATALOGS;
+provider.theme = 'light'; // 'light' | 'dark' | token overrides object
+```
+
+```html
+<freesail-provider>
+  <!-- surfaces go here -->
+</freesail-provider>
+```
+
+The gateway URL is derived automatically from the current host on port `3001`, same as React — override via the `gateway` attribute/property, or a `VITE_GATEWAY_URL`/`VITE_GATEWAY_PORT`-driven dev proxy (see `example/lit-app/vite.config.ts`).
+
+If you're building with Lit's reactive-element patterns rather than raw DOM calls, set `catalogs`/`theme` as property bindings in your own component's `render()` (e.g. `` html`<freesail-provider .catalogs=${CATALOGS} .theme=${activeTheme}>...</freesail-provider>` ``) — see `example/lit-app/src/app-root.ts` for a complete example, including a live light/dark/custom theme switcher.
+
+### Theming
+
+Identical token system to React — `@freesail/lit` re-exports the same `defaultLightTokens`/`defaultDarkTokens`/`FreesailThemeTokens` from `@freesail/core`:
+
+```ts
+import { defaultLightTokens, type FreesailThemeTokens } from '@freesail/lit';
+
+const myTheme: Partial<FreesailThemeTokens> = {
+  primary:      '#e11d48',  // Rose 600
+  primaryHover: '#be123c',  // Rose 700
+  bgRaised:     '#fff1f2',  // Rose 50
+  radiusMd:     '0px',      // Square corners
+};
+provider.theme = myTheme; // merges on top of the light theme defaults
+```
+
+See the **Theme Token Reference** in [Creating Custom Catalogs.md](./Creating%20Custom%20Catalogs.md#theme-token-reference) — the `--freesail-*` CSS custom properties are identical regardless of renderer.
+
+### Adding Surfaces
+
+`<freesail-surface>` is the direct equivalent of `FreesailSurface` — must be a descendant of `<freesail-provider>` in the DOM.
+
+```html
+<freesail-provider>
+  <!-- Client-managed surface (prefix with __) -->
+  <aside class="sidebar">
+    <freesail-surface surface-id="__chat"></freesail-surface>
+  </aside>
+
+  <!-- Agent-created surface (alphanumeric only) -->
+  <main class="content">
+    <freesail-surface surface-id="workspace"></freesail-surface>
+  </main>
+</freesail-provider>
+```
+
+Surface naming rules are identical to React — see the table in §3.
+
+### Reactive Controllers (the hooks.ts equivalent)
+
+Where React uses hooks, `@freesail/lit` uses `ReactiveController` classes — construct one per host element that needs to react to surface/connection state:
+
+```ts
+import { LitElement, html } from 'lit';
+import { ConnectionStatusController, SurfacesController } from '@freesail/lit';
+
+class StatusBar extends LitElement {
+  private _connection = new ConnectionStatusController(this);
+  private _surfaces = new SurfacesController(this);
+  override createRenderRoot() { return this; } // light DOM — matches the rest of @freesail/lit
+
+  override render() {
+    return html`
+      <span>${this._connection.isConnected ? 'Connected' : 'Disconnected'}</span>
+      <span>${this._surfaces.surfaces.length} active surfaces</span>
+    `;
+  }
+}
+customElements.define('status-bar', StatusBar);
+```
+
+`StatusBar` must render somewhere *inside* `<freesail-provider>` in the DOM for the controller's context lookup to resolve.
+
+### Writing catalog components
+
+Lit catalog components are **plain functions**, not custom elements: `(props: FreesailComponentProps) => TemplateResult`, using lit-html's `html` tag — no per-component registration or shadow DOM. Scaffold one with `npx freesail new catalog --framework lit` (see [Creating Custom Catalogs.md](./Creating%20Custom%20Catalogs.md), which covers both frameworks).
 
 ---
 
@@ -438,7 +545,17 @@ This starts three independent processes:
 |---------|-----|---------|
 | Gateway | `http://localhost:3001` (A2UI), `http://127.0.0.1:3000` (MCP) | Bridge between agent and UI |
 | Agent | `http://localhost:3002` | AI agent with health endpoint |
-| UI | `http://localhost:5173` | Vite React dev server |
+| UI | `http://localhost:5173` | Vite React dev server (`example/react-app`) |
+
+To try the Lit renderer instead, run the Lit example app's own dev server alongside the gateway/agent (it isn't part of `run-all.sh`):
+
+```bash
+npm run dev -w freesail-lit-example
+```
+
+| Process | URL | Purpose |
+|---------|-----|---------|
+| UI (Lit) | `http://localhost:5174` | Vite Lit dev server (`example/lit-app`) |
 
 ---
 
@@ -460,6 +577,24 @@ function SessionInfo() {
   if (!sessionId) return <div>Connecting to Gateway...</div>;
 
   return <div>Connected Session: {sessionId}</div>;
+}
+```
+
+The Lit equivalent is `SessionIdController`:
+
+```ts
+import { LitElement, html } from 'lit';
+import { SessionIdController } from '@freesail/lit';
+
+class SessionInfo extends LitElement {
+  private _session = new SessionIdController(this);
+  override createRenderRoot() { return this; }
+
+  override render() {
+    return this._session.sessionId
+      ? html`<div>Connected Session: ${this._session.sessionId}</div>`
+      : html`<div>Connecting to Gateway...</div>`;
+  }
 }
 ```
 
