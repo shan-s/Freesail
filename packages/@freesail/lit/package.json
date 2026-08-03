@@ -1,6 +1,6 @@
 {
   "name": "@freesail/lit",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "Lit (lit-html/LitElement) frontend for Freesail A2UI SDK",
   "homepage": "https://www.freesail.ai",
   "type": "module",
@@ -37,7 +37,7 @@
     "lit": "^3.0.0"
   },
   "dependencies": {
-    "@freesail/core": "^0.9.4",
+    "@freesail/core": "^0.9.5",
     "@lit/context": "^1.1.0"
   },
   "devDependencies": {

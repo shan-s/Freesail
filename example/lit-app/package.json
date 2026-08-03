@@ -1,6 +1,6 @@
 {
   "name": "freesail-lit-example",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@freesail/standard-catalog-lit": "^0.9.4",
-    "@freesail/lit": "^0.9.4",
+    "@freesail/standard-catalog-lit": "^0.9.5",
+    "@freesail/lit": "^0.9.5",
     "freesail": "*",
     "lit": "^3.2.0"
   },

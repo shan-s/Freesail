@@ -1,6 +1,6 @@
 {
   "name": "@freesail/standard-catalog-lit",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "Standard UI Component Catalog for Freesail A2UI SDK (Lit implementation) - provides a collection of commonly used UI components to build agent-driven UIs with Lit / Web Components.",
   "homepage": "https://www.freesail.ai",
   "type": "module",
@@ -44,11 +44,11 @@
     "web components"
   ],
   "peerDependencies": {
-    "@freesail/lit": "^0.9.4",
+    "@freesail/lit": "^0.9.5",
     "lit": "^3.0.0"
   },
   "devDependencies": {
-    "@freesail/lit": "^0.9.4",
+    "@freesail/lit": "^0.9.5",
     "lit": "^3.2.0",
     "vitest": "^4.0.18"
   },
