@@ -110,7 +110,7 @@ type SessionNotification =
   | { type: 'error'; event: ClientErrorEvent };
 
 interface ActionEvent {
-  name: string;                          // action name, e.g. "submit_form", "chat_send"
+  name: string;                          // action name, e.g. "submit_form", "usr_msg"
   surfaceId: string;                     // which UI surface triggered it
   sourceComponentId: string;             // which component within the surface
   context: Record<string, unknown>;      // action-specific payload from the client

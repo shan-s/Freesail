@@ -2,7 +2,7 @@
 
 ## **1\. Executive Summary**
 
-Freesail is an Agent-driven UI SDK that enables AI Agents to drive user interfaces across any frontend framework (React, Angular, Legacy). It achieves this by decoupling the **Agent** (Brain) from the **Client** (Renderer) using the **Model Context Protocol (MCP)** and the **A2UI Protocol**.
+Freesail is an Agent-driven UI SDK that enables AI Agents to drive user interfaces across any frontend framework. It achieves this by decoupling the **Agent** (Brain) from the **Client** (Renderer) using the **Model Context Protocol (MCP)** and the **A2UI Protocol**. Two renderers ship today — **React** (`@freesail/react`) and **Lit** / Web Components (`@freesail/lit`) — both implementing the same Client responsibilities described below on top of the same framework-agnostic `@freesail/core`.
 
 The core philosophy is **"Headless & Contract-First"**. The system relies on a strict JSON schema (catalog.json) to define the UI capabilities, ensuring the Agent never "hallucinates" invalid UI components.
 
@@ -27,10 +27,10 @@ Freesail operates on a three-node architecture that separates control logic from
 
 ### **Node C: The Frontend (Renderer)**
 
-* **Role:** The presentation layer (React, Web Components).  
+* **Role:** The presentation layer. Currently implemented for **React** (`@freesail/react`) and **Lit** / Web Components (`@freesail/lit`).  
 * **Interface:** Connects to Freesail Server via HTTP SSE.  
 * **Responsibility:**  
-  * **Rendering:** Maps the incoming A2UI JSON tree to actual React components using a **Registry**.  
+  * **Rendering:** Maps the incoming A2UI JSON tree to actual framework components (React elements, or lit-html `TemplateResult`s) using a **Registry**. The recursive tree walk and all data-binding/function-evaluation logic (`resolveDataBindings`, `evaluateFunction`, template interpolation) is itself framework-agnostic and lives in `@freesail/core`, shared verbatim by both renderers — only the tree-walk shell and the DOM output differ.  
   * **State Management:** Maintains the local Data Model and handles user interactions.  
   * **Resilience:** Queues user actions if the network drops and retries automatically.
 
@@ -101,10 +101,13 @@ The data model is sent as `dataModel` alongside the action in the POST body:
 
 * **Purpose:** First-party catalog definitions shipped with Freesail.  
 * **Key Files:**  
-  * standard\_catalog/: Core UI components (Text, Icon, Row, Column, Card, Button, Input, etc.).  
-  * chat\_catalog/: Chat-specific components.  
+  * standard\_catalog/: Core UI components (Text, Icon, Row, Column, Card, Button, Input, etc.), implemented for React.  
+  * standard\_catalog\_lit/: The same standard catalog — identical `catalogId` and JSON schema — implemented for Lit instead of React.  
+  * chat\_catalog/: Chat-specific components (React only — no Lit implementation yet).  
   * common/: Shared types and helpers used across catalogs.  
   * schemas/: JSON schema definitions for catalog validation.
+
+Catalog *schemas* (the component/function vocabulary an agent sees) are renderer-agnostic by design — a catalog package targets one renderer for its implementation, but two catalog packages implementing the same schema under the same `catalogId` (like `standard_catalog` and `standard_catalog_lit`) are interchangeable from the agent's point of view.
 
 ### **/packages/agentruntime**
 
@@ -120,12 +123,23 @@ The data model is sent as `dataModel` alongside the action in the POST body:
 
 * **Purpose:** The React implementation of the Renderer.  
 * **Key Files:**  
-  * FreesailSurface.tsx: The main container component that users drop into their app.  
+  * FreesailSurface.tsx: The main container component that users drop into their app. Owns the recursive tree walk that turns a surface's component list into React elements — the data-binding/function-evaluation logic it calls is imported from `@freesail/core`, not implemented here.  
   * FreesailProvider.tsx: React context provider that connects to the Freesail Gateway.  
   * hooks.ts: Hooks for interacting with surfaces and data (`useSurface`, `useSurfaceData`, `useFreesailContext`).  
-  * registry.ts: Maps catalog component names to React components via `withCatalog()`.  
+  * registry.ts: Maps catalog component names to React components via `withCatalog()`. The underlying `ComponentRegistry` class lives in `@freesail/core`, generic over the component-value type — `@freesail/lit` instantiates its own copy of the same class.  
   * context.ts: Internal React context definitions.  
-  * theme.tsx: Theming support.
+  * theme.tsx: Theming support (thin wrapper around `@freesail/core`'s framework-agnostic design tokens).
+
+### **/packages/lit**
+
+* **Purpose:** The Lit / Web Components implementation of the Renderer — same responsibilities as `/packages/react`, different rendering layer.  
+* **Key Files:**  
+  * FreesailSurfaceElement.ts: The `<freesail-surface>` custom element. Same role as React's FreesailSurface.tsx.  
+  * FreesailProviderElement.ts: The `<freesail-provider>` custom element. Same role as React's FreesailProvider.tsx; publishes context via `@lit/context` instead of React Context.  
+  * render-tree.ts: The recursive walk that turns a surface's component list into lit-html `TemplateResult`s — the Lit-specific counterpart to the tree-walk portion of React's FreesailSurface.tsx. Calls the same `@freesail/core` binding-engine functions.  
+  * controllers.ts: `ReactiveController` classes (`SurfaceController`, `SurfaceDataController`, `ConnectionStatusController`, `SurfacesController`, `SessionIdController`) — the Lit analogue of React's hooks.ts.  
+  * registry.ts: Defines the Lit component contract (`(props) => TemplateResult`, no per-component custom-element registration) and instantiates its own `ComponentRegistry` from `@freesail/core`.  
+  * context.ts: `@lit/context` context key definition, sharing `FreesailContextValue`'s shape with `@freesail/react`.
 
 ### **/packages/gateway**
 
@@ -155,8 +169,8 @@ We do not write code first. We write the **Contract** (catalog.json) first.
 
 1. Define a component (e.g., Ticker) in catalog.json.  
 2. The Agent *immediately* sees a new tool: render\_ticker.  
-3. The React Developer implements Ticker.tsx using `withCatalog(catalogId, 'Ticker', TickerComponent)`.  
-   This ensures the Agent and the UI never drift out of sync.
+3. The Frontend Developer implements `Ticker` against whichever renderer their catalog package targets — a React function component in `components.tsx`, or a Lit render function (`(props) => TemplateResult`) in `components.ts` — and adds it to the catalog's flat component map (`{ ..., Ticker }`). The whole map is registered in one call when the `CatalogDefinition` is passed to `FreesailProvider`/`<freesail-provider>`. (Both `@freesail/react` and `@freesail/lit` also export a lower-level `withCatalog(catalogId, name, Component)` helper for registering a single component directly against the registry outside this flow, but the generated catalog map is the path every scaffolded and first-party catalog actually uses.)  
+   This ensures the Agent and the UI never drift out of sync, regardless of which renderer implements the catalog.
 
 ### **Stateless Agent / Stateful Client**
 

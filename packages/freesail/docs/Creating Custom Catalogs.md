@@ -1,14 +1,17 @@
 # Creating Custom Catalogs
 
-This guide explains how to create a custom Freesail catalog — a package that bundles a JSON schema describing UI components with their concrete React implementations. Agents use the schema to know what components exist; the React code renders them in the browser.
+This guide explains how to create a custom Freesail catalog — a package that bundles a JSON schema describing UI components with their concrete implementations. Agents use the schema to know what components exist; the implementation code renders them in the browser.
+
+A catalog package targets **one renderer** — React or Lit — chosen at scaffold time. The two are implemented separately (JSX vs. lit-html), but everything else in this guide (schema authoring, the inclusion model, validation, theming) is identical between them; code samples below are shown for both where the API differs.
 
 ## Quick Start
 
 ```bash
-npx freesail new catalog
+npx freesail new catalog                    # React (default)
+npx freesail new catalog --framework lit    # Lit
 ```
 
-This scaffolds a complete catalog package with a starter layout and a default import of the standard catalog's `Card` component. You own every file and can modify them freely.
+Both scaffold a complete catalog package with a starter layout and a default import of the standard catalog's `Card` component (from `@freesail/standard-catalog` or `@freesail/standard-catalog-lit`, matching whichever framework you chose). You own every file and can modify them freely. If you omit `--framework`, the CLI prompts for one interactively (`react`/`lit`), defaulting to `react`.
 
 ## Generated Structure
 
@@ -17,18 +20,22 @@ This scaffolds a complete catalog package with a starter layout and a default im
   package.json
   tsconfig.json
   src/
-    {name}-catalog.json      # Generated — full resolved catalog (do not edit directly)
-    index.ts                  # Exports CatalogDefinition
+    freesailconfig.json        # Catalog metadata, incl. "framework": "react" | "lit"
+    {name}-catalog.json        # Generated — full resolved catalog (do not edit directly)
+    index.ts                   # Exports CatalogDefinition
     includes/
-      catalog.include.json   # Declare which packages to import from
-      generated-includes.ts  # Auto-generated bridge (do not edit)
+      catalog.include.json     # Declare which packages to import from
+      generated-includes.ts    # Auto-generated bridge (do not edit)
     components/
-      components.json        # Custom component schemas
-      components.tsx         # Custom component implementations
+      components.json          # Custom component schemas
+      components.tsx           # Custom component implementations (React)
+      components.ts            # ...or this, if --framework lit was chosen — never both
     functions/
-      functions.json         # Custom function schemas
-      functions.ts           # Custom function implementations
+      functions.json           # Custom function schemas
+      functions.ts             # Custom function implementations (same for both frameworks)
 ```
+
+`freesail prepare catalog`/`freesail validate catalog` read the `framework` field from `src/freesailconfig.json` to know which of `components.tsx`/`components.ts` to expect and which package (`@freesail/react`/`@freesail/lit`) to wire `generated-includes.ts` up against. Catalogs scaffolded before Lit support existed have no `framework` field — they're treated as `react` by default, so nothing needs to change for existing catalogs.
 
 ### Catalog ID
 
@@ -77,8 +84,11 @@ Both run automatically before each `npm run build`.
 The inclusion model lets you pull components and functions from any installed catalog package into your own catalog. This is the primary way to reuse the standard Freesail components.
 
 ```bash
-npx freesail include catalog --package @freesail/standard-catalog
+npx freesail include catalog --package @freesail/standard-catalog       # React catalogs
+npx freesail include catalog --package @freesail/standard-catalog-lit   # Lit catalogs
 ```
+
+Include from whichever package matches your catalog's own framework — `@freesail/standard-catalog` and `@freesail/standard-catalog-lit` implement the identical schema/`catalogId`, but their component exports aren't interchangeable (`React.ComponentType` vs. a lit-html render function), so `freesail prepare catalog` generates a `generated-includes.ts` typed against whichever one you included from.
 
 This command:
 1. Reads all components and functions from the installed package's catalog JSON
@@ -166,9 +176,11 @@ After editing, run `npx freesail prepare catalog` to regenerate the resolved cat
 
 ---
 
-## Step 2: Implement Components (`components/components.tsx`)
+## Step 2: Implement Components
 
-The scaffolded file imports included components from `generated-includes.ts` and spreads them into the export map. Add your custom components alongside:
+The scaffolded file (`components/components.tsx` for React, `components/components.ts` for Lit) imports included components from `generated-includes.ts` and spreads them into the export map. Add your custom components alongside.
+
+### React (`components/components.tsx`)
 
 ```tsx
 import React, { type CSSProperties } from 'react';
@@ -214,30 +226,74 @@ export const myappCatalogComponents = {
 - Use CSS custom properties (`var(--freesail-*)`) for theming.
 - The map keys must exactly match the component names in the JSON schema.
 
+### Lit (`components/components.ts`)
+
+Catalog components for Lit are **plain functions**, not custom elements — `(props: FreesailComponentProps) => TemplateResult`, using lit-html's `html` tag. There's no per-component registration or shadow DOM; `<freesail-surface>` calls these functions directly as it walks the component tree, same as React calls a function component.
+
+```ts
+import { html } from 'lit';
+import { styleMap } from 'lit/directives/style-map.js';
+import type { FreesailComponentProps, FreesailComponent } from '@freesail/lit';
+import { includedComponents } from '../includes/generated-includes.js';
+
+const StatusCard: FreesailComponent = ({ component, children }: FreesailComponentProps) => {
+  const title    = (component['title'] as string) ?? '';
+  const message  = (component['message'] as string) ?? '';
+  const severity = (component['severity'] as string) ?? 'info';
+
+  const colors: Record<string, string> = {
+    info:    'var(--freesail-info, #3b82f6)',
+    warning: 'var(--freesail-warning, #f59e0b)',
+    error:   'var(--freesail-error, #ef4444)',
+    success: 'var(--freesail-success, #22c55e)',
+  };
+
+  const style = {
+    padding: '16px',
+    borderRadius: '8px',
+    border: `1px solid ${colors[severity] ?? colors['info']}`,
+  };
+
+  return html`
+    <div style=${styleMap(style)}>
+      <strong>${title}</strong>
+      ${message ? html`<p style="margin:8px 0 0">${message}</p>` : ''}
+      ${children}
+    </div>
+  `;
+};
+
+export const myappCatalogComponents: Record<string, FreesailComponent> = {
+  ...includedComponents,
+  StatusCard,
+};
+```
+
+**Conventions:** same as React (cast props, use `var(--freesail-*)` for theming, map keys must match the schema), plus:
+- Prefer `const X: FreesailComponent = (props) => ...` over `function X(props) {...}` — the explicit `FreesailComponent` type annotation catches prop-shape mistakes the untyped form wouldn't.
+- Default the `children` fallback carefully: `children` is `undefined` (not React's `null`) when a component has no structural `child`/`children`, so `children ?? component['label']`-style fallbacks work the same way — but don't assume it's ever `null`.
+- `styleMap()` (from `lit/directives/style-map.js`) is the equivalent of a React inline `style` object — plain string concatenation works too for static styles.
+
 ### `FreesailComponentProps` reference
 
-| Prop | Type | Purpose |
-|------|------|---------|
-| `component` | `A2UIComponent` | All resolved props the agent sent for this component instance |
-| `children` | `ReactNode` | Rendered child components (for containers) |
-| `scopeData` | `unknown` | Current item data when inside a dynamic list template |
-| `dataModel` | `Record<string, unknown>` | Full surface data model (read-only snapshot) |
-| `onAction` | `(name, context) => void` | Dispatch a named action to the agent |
-| `onDataChange` | `(path, value) => void` | Write a value to the local data model (two-way binding) |
-| `onFunctionCall` | `(call) => void` | Execute a client-side function call |
+| Prop | Type (React) | Type (Lit) | Purpose |
+|------|------|------|---------|
+| `component` | `A2UIComponent` | `A2UIComponent` | All resolved props the agent sent for this component instance |
+| `children` | `ReactNode` | `unknown` (a `TemplateResult`, array of them, or lit's `nothing`) | Rendered child components (for containers) — interpolate directly, e.g. `` html`<div>${children}</div>` `` |
+| `scopeData` | `unknown` | `unknown` | Current item data when inside a dynamic list template |
+| `dataModel` | `Record<string, unknown>` | `Record<string, unknown>` | Full surface data model (read-only snapshot) |
+| `onAction` | `(name, context) => void` | `(name, context) => void` | Dispatch a named action to the agent |
+| `onDataChange` | `(path, value) => void` | `(path, value) => void` | Write a value to the local data model (two-way binding) |
+| `onFunctionCall` | `(call) => void` | `(call) => void` | Execute a client-side function call |
 
 ### Two-way binding (input components)
 
-For components that let users enter data, read the bound path from `component['__rawValue']` and call `onDataChange` on every change:
+For components that let users enter data, read the bound path via `meta.getBinding()` — **not** `component['__rawValue']` directly; the `__raw*`/`__*UpdatedAt` framework keys are stripped out of `component` and surfaced through `meta` specifically so components never have to touch `__`-prefixed keys by hand. Call `onDataChange` on every change. Fall back to a synthetic `/input/{componentId}` path when the prop isn't data-bound (so the component still works standalone, without an agent-provided binding).
 
 ```tsx
-export function MyInput({ component, onDataChange }: FreesailComponentProps) {
+export function MyInput({ component, meta, onDataChange }: FreesailComponentProps) {
   const value = (component['value'] as string) ?? '';
-
-  const rawValue = component['__rawValue'] as { path?: string } | string | undefined;
-  const boundPath = typeof rawValue === 'object' && rawValue?.path
-    ? rawValue.path
-    : `/input/${component.id}`;
+  const boundPath = meta.getBinding('value')?.path ?? `/input/${component.id}`;
 
   return (
     <input
@@ -248,14 +304,27 @@ export function MyInput({ component, onDataChange }: FreesailComponentProps) {
 }
 ```
 
+The Lit equivalent — note the native `<input>` needs no local component state (there's no hook equivalent for a plain render function): the value is read straight from `component['value']` each render, and `@input` writes back through `onDataChange`, which triggers a fresh surface render reflecting the change:
+
+```ts
+const MyInput: FreesailComponent = ({ component, meta, onDataChange }: FreesailComponentProps) => {
+  const value = (component['value'] as string) ?? '';
+  const boundPath = meta.getBinding('value')?.path ?? `/input/${component.id}`;
+
+  return html`
+    <input .value=${value} @input=${(e: Event) => onDataChange?.(boundPath, (e.target as HTMLInputElement).value)} />
+  `;
+};
+```
+
 ---
 
 ## Step 3: Add Custom Functions (`functions/functions.ts`)
 
-The scaffolded file re-exports included functions. Add custom functions alongside:
+The scaffolded file re-exports included functions. Add custom functions alongside. Functions are framework-agnostic — this file looks identical whether your catalog targets React or Lit, since `FunctionImplementation` comes from `@freesail/core` either way:
 
 ```ts
-import type { FunctionImplementation } from '@freesail/react';
+import type { FunctionImplementation } from '@freesail/core';
 import { includedFunctions } from '../includes/generated-includes.js';
 
 const truncate: FunctionImplementation = (args) => {
@@ -276,10 +345,17 @@ Remember to also declare the function in `src/functions/functions.json` (see Ste
 
 ## Step 4: Wire Up `index.ts`
 
-The scaffolded `index.ts` is ready to use:
+The scaffolded `index.ts` is ready to use — the only difference between frameworks is where `CatalogDefinition` comes from:
 
 ```ts
+// React
 import type { CatalogDefinition } from '@freesail/react';
+```
+```ts
+// Lit
+import type { CatalogDefinition } from '@freesail/lit';
+```
+```ts
 import { myappCatalogComponents } from './components/components.js';
 import { myappCatalogFunctions } from './functions/functions.js';
 import catalogSchema from './myapp-catalog.json';
@@ -292,7 +368,7 @@ export const MyappCatalog: CatalogDefinition = {
 };
 ```
 
-> **`formatString` is required.** The agent system prompt relies on it. Both `freesail prepare catalog` and `freesail validate catalog` will warn if it is missing. Import it from `@freesail/standard-catalog` via `catalog.include.json`, or implement it yourself.
+> **`formatString` is required.** The agent system prompt relies on it. Both `freesail prepare catalog` and `freesail validate catalog` will warn if it is missing. Import it from `@freesail/standard-catalog`/`@freesail/standard-catalog-lit` via `catalog.include.json`, or implement it yourself.
 
 ---
 
@@ -440,9 +516,11 @@ const style: CSSProperties = {
 
 ## `CatalogDefinition` API Reference
 
+Imported from `@freesail/react` or `@freesail/lit` depending on your catalog's framework — same shape, only the `components` value type differs.
+
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `namespace` | `string` | ✅ | The `catalogId` URI — must match `schema.catalogId` |
 | `schema` | `object` | ✅ | The parsed JSON schema object |
-| `components` | `Record<string, ComponentType<FreesailComponentProps>>` | ✅ | Component name → React component map |
+| `components` | `Record<string, ComponentType<FreesailComponentProps>>` (React) or `Record<string, FreesailComponent>` (Lit) | ✅ | Component name → component map |
 | `functions` | `Record<string, FunctionImplementation>` | ✅ | Function name → implementation map (must include `formatString`) |

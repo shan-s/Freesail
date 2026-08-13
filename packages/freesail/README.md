@@ -12,22 +12,28 @@ Freesail operates on a three-node pattern:
 
 - **Agent**: The intelligence layer that decides what to show, using MCP tools exposed by the Gateway.
 - **Gateway**: A Node.js bridge that connects to the agent via MCP and streams A2UI messages to the frontend via Server-Sent Events (SSE).
-- **Frontend**: The presentation layer (React) that receives A2UI messages and renders dynamic UI statefully.
+- **Frontend**: The presentation layer that receives A2UI messages and renders dynamic UI statefully. Two renderers ship today — **React** (`@freesail/react`) and **Lit** / Web Components (`@freesail/lit`) — both built on the same framework-agnostic `@freesail/core`, so a catalog's component vocabulary (its `catalogId` and JSON schema) is portable between them; only the rendering implementation differs.
 
 ## Packages
 
 | Package | Description |
 |---------|-------------|
-| `freesail` | CLI and core libraries for running and configuring Freesail |
-| `@freesail/core` | A2UI protocol definitions, parser, and transport |
+| `freesail` | CLI and core libraries for running and configuring Freesail. Re-exports the React renderer as `ReactUI` and the Lit renderer as `LitUI`. |
+| `@freesail/core` | A2UI protocol definitions, parser, and transport — framework-agnostic, shared by every renderer |
 | `@freesail/gateway` | Node.js MCP bridge server |
 | `@freesail/react` | React renderer (`<FreesailProvider>` and surface hooks) |
+| `@freesail/lit` | Lit renderer (`<freesail-provider>`/`<freesail-surface>` custom elements and reactive controllers) |
 | `@freesail/agent-runtime` | Runtime library for building Freesail agents |
-| `@freesail/standard-catalog` | Standard UI component catalog (Text, Button, Chart, etc.) |
-| `@freesail/chat-catalog` | Chat interface component catalog |
+| `@freesail/standard-catalog` | Standard UI component catalog for React (Text, Button, Chart, etc.) |
+| `@freesail/standard-catalog-lit` | The same standard catalog, implemented for Lit — same `catalogId`/schema as `@freesail/standard-catalog` |
+| `@freesail/chat-catalog` | Chat interface component catalog (React) |
 | `@freesail/logger` | Structured logging for the Freesail ecosystem |
 
 Community packages are in `packages/@freesail-community/`.
+
+### Choosing a renderer
+
+`freesail new catalog` scaffolds a catalog package for either renderer via `--framework react` (default) or `--framework lit`. A catalog package is tied to one framework (its components are implemented in JSX or lit-html, not both), but the catalog's *schema* — the component/function vocabulary an agent sees — is renderer-agnostic, so the same agent can drive either a React or a Lit frontend without changes, as long as both sides register a catalog with the same `catalogId`.
 
 ## Key Concepts
 

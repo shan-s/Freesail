@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "useDefineForClassFields": false,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "freesail": ["../../packages/freesail/src"],
+      "@freesail/core": ["../../packages/@freesail/core/src"],
+      "@freesail/lit": ["../../packages/@freesail/lit/src"],
+      "@freesail/standard-catalog-lit": ["../../packages/@freesail/standard-catalog-lit/src"]
+    }
+  },
+  "include": [
+    "src"
+  ]
+}

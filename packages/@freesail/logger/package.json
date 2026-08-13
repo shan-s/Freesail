@@ -1,6 +1,6 @@
 {
   "name": "@freesail/logger",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "Standard logging library for Freesail A2UI SDK",
   "homepage": "https://www.freesail.ai",
   "type": "module",

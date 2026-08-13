@@ -1,6 +1,6 @@
 {
   "name": "freesail",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "CLI and core libraries for Freesail - an open-source A2UI SDK",
   "homepage": "https://www.freesail.ai",
   "main": "./dist/index.js",
@@ -30,21 +30,26 @@
     "tsup": "^8.0.0"
   },
   "dependencies": {
-    "@freesail/core": "^0.9.4",
-    "@freesail/gateway": "^0.9.4",
-    "@freesail/react": "^0.9.4",
+    "@freesail/core": "^0.9.5",
+    "@freesail/gateway": "^0.9.5",
+    "@freesail/react": "^0.9.5",
+    "@freesail/lit": "^0.9.5",
     "ajv": "^8.12.0",
     "ajv-formats": "^3.0.1"
   },
   "peerDependencies": {
     "react": ">=18",
-    "react-dom": ">=18"
+    "react-dom": ">=18",
+    "lit": ">=3"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "lit": {
       "optional": true
     }
   },

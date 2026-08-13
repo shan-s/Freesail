@@ -1,0 +1,53 @@
+{
+  "name": "@freesail/lit",
+  "version": "0.9.5",
+  "description": "Lit (lit-html/LitElement) frontend for Freesail A2UI SDK",
+  "homepage": "https://www.freesail.ai",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "a2ui",
+    "freesail",
+    "agent-driven ui",
+    "generative ui",
+    "ai agent",
+    "lit",
+    "web components"
+  ],
+  "peerDependencies": {
+    "lit": "^3.0.0"
+  },
+  "dependencies": {
+    "@freesail/core": "^0.9.5",
+    "@lit/context": "^1.1.0"
+  },
+  "devDependencies": {
+    "lit": "^3.2.0",
+    "vitest": "^4.0.18"
+  },
+  "author": {
+    "name": "Thendral AI Ltd",
+    "email": "support@thendral.ai",
+    "url": "https://www.thendral.ai"
+  },
+  "license": "MIT"
+}
