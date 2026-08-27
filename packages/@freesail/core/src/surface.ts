@@ -345,6 +345,30 @@ export class SurfaceManager {
   }
 
   /**
+   * Get the data model for a surface with client-only state removed.
+   *
+   * Top-level keys prefixed with `__` hold internal client state that exists purely to
+   * drive local rendering — the agent has no use for it. Every path that sends a data
+   * model upstream must read it through here rather than touching `dataModel` directly,
+   * so that "what the agent may see" is defined in exactly one place.
+   *
+   * Only top-level keys are filtered, matching the convention used for `__`-prefixed
+   * surface and component IDs elsewhere in the protocol.
+   */
+  getSharedDataModel(surfaceId: SurfaceId): Record<string, unknown> | undefined {
+    const model = this.surfaces.get(surfaceId)?.dataModel;
+    if (!model) return undefined;
+
+    const shared: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(model)) {
+      if (!key.startsWith('__')) {
+        shared[key] = value;
+      }
+    }
+    return shared;
+  }
+
+  /**
    * Check if a surface has sendDataModel enabled.
    */
   shouldSendDataModel(surfaceId: SurfaceId): boolean {

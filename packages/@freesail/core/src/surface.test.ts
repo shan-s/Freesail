@@ -203,6 +203,47 @@ describe('SurfaceManager.updateComponents', () => {
 // updateDataModel
 // ---------------------------------------------------------------------------
 
+describe('SurfaceManager.getSharedDataModel', () => {
+  let manager: SurfaceManager;
+
+  beforeEach(() => {
+    manager = makeManager();
+    manager.createSurface({ surfaceId: 's1', catalogId: 'cat1' });
+  });
+
+  afterEach(() => {
+    manager.dispose();
+  });
+
+  it('strips top-level __ keys the agent has no use for', () => {
+    manager.updateDataModel('s1', '/', {
+      name: 'Alice',
+      __draft: 'client-only',
+      __scroll: 42,
+    });
+
+    expect(manager.getSharedDataModel('s1')).toEqual({ name: 'Alice' });
+    // The unfiltered view is unchanged — local rendering still needs that state.
+    expect(manager.getDataModel('s1')).toMatchObject({ __draft: 'client-only' });
+  });
+
+  it('leaves nested __ keys alone, matching the top-level-only convention', () => {
+    manager.updateDataModel('s1', '/', { user: { __internal: 1, age: 30 } });
+
+    expect(manager.getSharedDataModel('s1')).toEqual({ user: { __internal: 1, age: 30 } });
+  });
+
+  it('returns undefined for an unknown surface', () => {
+    expect(manager.getSharedDataModel('missing')).toBeUndefined();
+  });
+
+  it('returns an empty object when every key is client-only', () => {
+    manager.updateDataModel('s1', '/', { __only: true });
+
+    expect(manager.getSharedDataModel('s1')).toEqual({});
+  });
+});
+
 describe('SurfaceManager.updateDataModel', () => {
   let manager: SurfaceManager;
 

@@ -39,6 +39,7 @@ import type {
   A2UIClientCapabilities,
   A2UIComponent,
   JsonPointer,
+  SessionStartInfo,
   FreesailContextValue,
   FreesailThemeProp,
   FreesailThemeMode,
@@ -119,6 +120,7 @@ export class FreesailProviderElement extends LitElement {
     transportOptions: { attribute: false },
     additionalCapabilities: { attribute: false },
     onConnectionChange: { attribute: false },
+    onSessionInvalidated: { attribute: false },
     onError: { attribute: false },
     onBeforeCreateSurface: { attribute: false },
     onBeforeUpdateComponents: { attribute: false },
@@ -156,6 +158,13 @@ export class FreesailProviderElement extends LitElement {
   additionalCapabilities?: Record<string, unknown>;
   /** Called when connection state changes. */
   onConnectionChange?: (connected: boolean) => void;
+  /**
+   * Called when the gateway declined to resume the previous session, after the stale
+   * surfaces have been cleared. The UI is now empty and the agent has no memory of what
+   * came before, so this is where an app re-runs whatever bootstrapping it does on a cold
+   * start. Also dispatched as a `freesail-session-invalidated` DOM event.
+   */
+  onSessionInvalidated?: (previousSessionId: string | null) => void;
   /** Called when an error occurs. */
   onError?: (error: Error) => void;
   /** Called before honouring an agent createSurface. Return allowed: false to block. */
@@ -290,7 +299,9 @@ export class FreesailProviderElement extends LitElement {
           surfaceId,
           '__get_data_model_response',
           '__system' as ComponentId,
-          { current_data_model: surface.dataModel ?? {} }
+          // Same view the piggybacked data model uses — an explicit request must not
+          // expose client-only `__` state that the implicit path strips.
+          { current_data_model: surfaceManager.getSharedDataModel(surfaceId) ?? {} }
         );
         return;
       }
@@ -381,13 +392,46 @@ export class FreesailProviderElement extends LitElement {
       }
     }, 300);
 
+    // Claim every surface that actually exists, whoever created it. Surfaces the agent
+    // creates are also registered from the transport, but client-created ones (a locally
+    // bootstrapped chat surface) have no other path — without the mapping, an upstream
+    // action that arrives with no session header is discarded by the gateway.
+    // Registration is deduped and deferred until the session ID is known.
+    const unsubRegisterSurface = surfaceManager.on('surfaceCreated', (surface) => {
+      transport.registerSurface(surface.id);
+    });
+
     const unsubSaveCreated   = surfaceManager.on('surfaceCreated',    saveSurfaceState);
     const unsubSaveUpdated   = surfaceManager.on('componentsUpdated', saveSurfaceState);
     const unsubSaveDataModel = surfaceManager.on('dataModelUpdated',  saveSurfaceState);
     const unsubSaveDeleted   = surfaceManager.on('surfaceDeleted',    saveSurfaceState);
 
     // When session starts, restore surface state from sessionStorage, then register catalog schemas.
-    transport.on('sessionStart', (sessionId: string) => {
+    transport.on('sessionStart', (sessionId: string, info?: SessionStartInfo) => {
+      // The gateway refused to resume the session these surfaces belong to. Because
+      // reconnects move through 'reconnecting' rather than 'disconnected', the
+      // clearSurfaces() above never ran and the UI is still rendering surfaces whose
+      // component IDs the new session has never seen — interactive, but backed by nothing.
+      // Drop them so the app starts from a state the gateway agrees with.
+      if (info?.invalidated) {
+        surfaceManager.clearSurfaces();
+        if (info.previousSessionId) {
+          try {
+            sessionStorage.removeItem(`freesail_surfaces_${info.previousSessionId}`);
+          } catch {
+            // Storage unavailable — the orphaned snapshot dies with the tab anyway.
+          }
+        }
+        this.onSessionInvalidated?.(info.previousSessionId);
+        this.dispatchEvent(
+          new CustomEvent('freesail-session-invalidated', {
+            detail: { previousSessionId: info.previousSessionId },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      }
+
       try {
         const saved = sessionStorage.getItem(`freesail_surfaces_${sessionId}`);
         if (saved) {
@@ -430,6 +474,7 @@ export class FreesailProviderElement extends LitElement {
     this._unsubscribers = [
       unsubSurfaceDeleted, unsubOrphan, unsubOrphanComponents, unsubError,
       unsubSaveCreated, unsubSaveUpdated, unsubSaveDataModel, unsubSaveDeleted,
+      unsubRegisterSurface,
     ];
   }
 
@@ -458,18 +503,9 @@ export class FreesailProviderElement extends LitElement {
     // Send only the data model of the surface that triggered the action.
     let dataModel: { surfaceId: SurfaceId; dataModel: Record<string, unknown> } | undefined;
     if (this.surfaceManager.shouldSendDataModel(surfaceId)) {
-      const model = this.surfaceManager.getDataModel(surfaceId);
-      if (model && Object.keys(model).length > 0) {
-        // Filter out __-prefixed paths (client-only internal state)
-        const filtered: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(model)) {
-          if (!key.startsWith('__')) {
-            filtered[key] = value;
-          }
-        }
-        if (Object.keys(filtered).length > 0) {
-          dataModel = { surfaceId, dataModel: filtered };
-        }
+      const shared = this.surfaceManager.getSharedDataModel(surfaceId);
+      if (shared && Object.keys(shared).length > 0) {
+        dataModel = { surfaceId, dataModel: shared };
       }
     }
 

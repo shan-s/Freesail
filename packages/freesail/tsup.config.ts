@@ -19,7 +19,10 @@ export default defineConfig([
   {
     entry: ['src/index.ts'],
     format: ['cjs', 'esm'],
-    dts: true,
+    // Declarations are emitted by `tsc -p tsconfig.build.json` (see package.json
+    // build script) — tsup's dts bundler needs the legacy TypeScript compiler API,
+    // which TypeScript 7 no longer ships.
+    dts: false,
     clean: true,
     external: ['react', 'react-dom', 'react/jsx-runtime', 'lit', '@freesail/core', '@freesail/react', '@freesail/lit', '@freesail/standard-catalog'],
   },

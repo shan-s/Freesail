@@ -74,6 +74,9 @@ function App() {
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'custom'>('light');
   const [fontSize, setFontSize] = useState<'normal' | 'large'>('normal');
   const [maxConcurrentSurfaces, setMaxConcurrentSurfaces] = useState(2);
+  // Bumped when the gateway declines to resume our session. The provider has cleared the
+  // stale surfaces by then, so the chat surface has to be rebuilt from scratch.
+  const [bootstrapNonce, setBootstrapNonce] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => setMaxConcurrentSurfaces(3), 2 * 60 * 1000);
@@ -124,6 +127,12 @@ function App() {
           onConnectionChange={(connected) => {
             console.log('Connection status:', connected);
           }}
+          onSessionInvalidated={(previousSessionId) => {
+            console.warn(
+              `Session ${previousSessionId} could not be resumed — starting fresh.`
+            );
+            setBootstrapNonce((n) => n + 1);
+          }}
           onError={(error) => {
             console.error('Freesail error:', error);
           }}
@@ -137,7 +146,7 @@ function App() {
             return { allowed: true, message: '' };
           }}
         >
-          <ChatBootstrapper />
+          <ChatBootstrapper nonce={bootstrapNonce} />
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
             {/* Chat Surface — rendered by the agent via A2UI */}
             <div style={{ width: `${chatWidth}px`, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
@@ -226,7 +235,7 @@ function ThemeButton({ active, onClick, children }: { active: boolean, onClick: 
 /**
  * Initializes the __chat surface natively so the agent doesn't need to.
  */
-function ChatBootstrapper() {
+function ChatBootstrapper({ nonce = 0 }: { nonce?: number }) {
   const { surfaceManager } = ReactUI.useFreesailContext();
 
   useEffect(() => {
@@ -281,7 +290,8 @@ function ChatBootstrapper() {
 
     // 3. Set initial data model
     surfaceManager.updateDataModel('__chat', '/', { messages: [], isTyping: false, stream: { token: '', active: false } });
-  }, [surfaceManager]);
+    // `nonce` re-runs this after a session invalidation wiped the surface.
+  }, [surfaceManager, nonce]);
 
   return null;
 }

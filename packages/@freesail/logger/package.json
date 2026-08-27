@@ -1,6 +1,6 @@
 {
   "name": "@freesail/logger",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "Standard logging library for Freesail A2UI SDK",
   "homepage": "https://www.freesail.ai",
   "type": "module",
@@ -40,6 +40,6 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.3.0"
+    "typescript": "^7.0.2"
   }
 }

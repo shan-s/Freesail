@@ -54,6 +54,27 @@ export interface TransportOptions {
 }
 
 /**
+ * Details accompanying a `sessionStart` event, describing how the session was established.
+ */
+export interface SessionStartInfo {
+  /** True when the gateway resumed the exact session the client asked for. */
+  resumed: boolean;
+  /** The session ID the client attempted to resume, or null on a first connection. */
+  previousSessionId: string | null;
+  /**
+   * True when the client had a prior session that the gateway did NOT resume — because it
+   * expired, was unknown, or was still live in another tab. Any surfaces the client is
+   * holding, and any actions queued against them, belong to a session that no longer
+   * exists: they reference component IDs the new session has never seen. Consumers must
+   * discard client state when this is true.
+   *
+   * Note this is narrower than `!resumed`: a first-ever connection is also not a resume,
+   * but has no stale state to discard, so `invalidated` stays false there.
+   */
+  invalidated: boolean;
+}
+
+/**
  * Event types emitted by the transport.
  */
 export interface TransportEvents {
@@ -62,10 +83,22 @@ export interface TransportEvents {
   error: (error: Error) => void;
   queueFlushed: (count: number) => void;
   /** Emitted when the server assigns a session ID on connection */
-  sessionStart: (sessionId: string) => void;
+  sessionStart: (sessionId: string, info: SessionStartInfo) => void;
+  /**
+   * Emitted when queued upstream messages are discarded because the session that owns
+   * them was invalidated. The messages are handed back so callers can regenerate
+   * equivalent intent against the new session — they must not be replayed as-is.
+   */
+  queueDropped: (messages: UpstreamMessage[], reason: 'sessionInvalidated') => void;
 }
 
 type EventCallback<K extends keyof TransportEvents> = TransportEvents[K];
+
+/**
+ * How long to wait after the SSE stream opens for the gateway's `connected` frame before
+ * assuming it will never arrive and flushing the queue anyway.
+ */
+const SESSION_HANDSHAKE_TIMEOUT = 2000;
 
 const DEFAULT_OPTIONS: Required<Omit<TransportOptions, 'gateway' | 'capabilities' | 'name'>> = {
   autoReconnect: true,
@@ -128,10 +161,20 @@ export class A2UITransport {
   private readonly storageKey: string;
   /** Surface IDs whose /register-surface POST failed and need to be retried on reconnect. */
   private pendingSurfaceRegistrations: Set<string> = new Set();
+  /**
+   * Surface IDs already registered with the current session, so repeat calls are free.
+   * Cleared when the session is invalidated — a new session knows none of these surfaces.
+   */
+  private registeredSurfaces: Set<string> = new Set();
   /** True while flushQueue() is running — prevents postMessage() failures from triggering re-entrant flushes. */
   private isFlushingQueue = false;
   /** Retry timer for re-attempting the queue when SSE stays alive but POST requests fail. */
   private queueRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Fallback timer that completes the session handshake if the gateway never sends a
+   * `connected` frame (older or third-party gateways), so the queue still drains.
+   */
+  private sessionHandshakeTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: TransportOptions) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -203,10 +246,13 @@ export class A2UITransport {
       this.eventSource.onopen = () => {
         this.setState('connected');
         this.currentReconnectDelay = this.options.reconnectDelay;
-        // Cancel any pending queue retry — onopen flushes everything directly.
         this.clearQueueRetryTimer();
-        this.flushQueue();
-        this.flushPendingSurfaceRegistrations();
+        // Deliberately NOT flushing here. onopen fires before the gateway's `connected`
+        // frame, which is the only thing that tells us whether our session survived —
+        // flushing now would post queued actions, under the old session ID, for surfaces
+        // the gateway may have already discarded. The flush happens in
+        // handleSessionEstablished() once that frame lands.
+        this.scheduleSessionHandshakeFallback();
       };
 
       this.eventSource.onmessage = (event) => {
@@ -233,6 +279,7 @@ export class A2UITransport {
   disconnect(clearSession = false): void {
     this.clearReconnectTimer();
     this.clearQueueRetryTimer();
+    this.clearSessionHandshakeTimer();
 
     if (this.eventSource) {
       this.eventSource.close();
@@ -422,17 +469,89 @@ export class A2UITransport {
     }
   }
 
+  /**
+   * Complete the session handshake once the gateway's `connected` frame lands.
+   *
+   * This is the point where the client learns whether the session it asked to resume
+   * survived, so it is also the point where queued upstream messages become safe to send
+   * (or must be discarded). Nothing upstream should be flushed before this runs.
+   */
+  private handleSessionEstablished(newSessionId: string, resumed: boolean): void {
+    this.clearSessionHandshakeTimer();
+
+    const previousSessionId = this._sessionId;
+    // The client had a session that the gateway did not hand back: it expired, was
+    // unknown, or is still live in another tab (the duplicate-tab path always mints a
+    // fresh ID). Either way the surfaces we are holding, and anything queued against
+    // them, belong to a session that no longer exists.
+    const invalidated = previousSessionId !== null && !resumed;
+
+    this._sessionId = newSessionId;
+    // Persist the server-assigned canonical session ID so it survives page refresh.
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(this.storageKey, newSessionId);
+      } catch {
+        // Quota exceeded or storage disabled — session resume degrades, nothing else breaks.
+      }
+    }
+
+    if (invalidated) {
+      // Queued actions target component IDs the new session has never seen, so delivering
+      // them would hand the agent actions for surfaces it never created. Hand them to
+      // listeners instead, so callers can regenerate equivalent intent against the new
+      // session rather than replay stale intent into it.
+      if (this.messageQueue.length > 0) {
+        const dropped = this.messageQueue;
+        this.messageQueue = [];
+        this.clearQueueRetryTimer();
+        this.emit('queueDropped', dropped, 'sessionInvalidated');
+      }
+      // Registrations for the old session's surfaces are equally meaningless now, and the
+      // new session has no surface→session mappings at all, so nothing counts as
+      // registered any more.
+      this.pendingSurfaceRegistrations.clear();
+      this.registeredSurfaces.clear();
+    }
+
+    this.emit('sessionStart', newSessionId, { resumed, previousSessionId, invalidated });
+
+    // Safe to send now: either the session was resumed, or the stale queue has been dropped.
+    this.flushQueue();
+    this.flushPendingSurfaceRegistrations();
+  }
+
+  /**
+   * Guard against a gateway that never sends a `connected` frame. Without it the queue,
+   * which no longer flushes on `onopen`, would never drain against such a gateway.
+   * Treated as a non-resumed session with no previous ID, i.e. flush without dropping.
+   */
+  private scheduleSessionHandshakeFallback(): void {
+    this.clearSessionHandshakeTimer();
+    this.sessionHandshakeTimer = setTimeout(() => {
+      this.sessionHandshakeTimer = null;
+      if (this.state !== 'connected') return;
+      this.flushQueue();
+      this.flushPendingSurfaceRegistrations();
+    }, SESSION_HANDSHAKE_TIMEOUT);
+  }
+
+  private clearSessionHandshakeTimer(): void {
+    if (this.sessionHandshakeTimer) {
+      clearTimeout(this.sessionHandshakeTimer);
+      this.sessionHandshakeTimer = null;
+    }
+  }
+
   private handleSSEMessage(data: string): void {
     // Check for connection message (sent before protocol messages)
     try {
       const parsed = JSON.parse(data);
       if (parsed && typeof parsed === 'object' && parsed.connected && parsed.sessionId) {
-        this._sessionId = parsed.sessionId as string;
-        // Persist the server-assigned canonical session ID so it survives page refresh.
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.setItem(this.storageKey, this._sessionId);
-        }
-        this.emit('sessionStart', this._sessionId);
+        this.handleSessionEstablished(
+          parsed.sessionId as string,
+          parsed.resumed === true
+        );
         return;
       }
     } catch {
@@ -442,11 +561,13 @@ export class A2UITransport {
     const result = this.parser.parse(data);
 
     for (const message of result.messages) {
-      // Auto-register surface→session mapping when we receive createSurface
-      if ('createSurface' in message && this._sessionId) {
+      // Auto-register surface→session mapping when we receive createSurface.
+      // registerSurface() defers if the session ID has not arrived yet, so this no longer
+      // needs to be dropped on the floor when the handshake is still in flight.
+      if ('createSurface' in message) {
         const createSurface = (message as unknown as Record<string, unknown>)['createSurface'];
         if (createSurface && typeof createSurface === 'object' && 'surfaceId' in createSurface) {
-          this.registerSurfaceWithGateway(createSurface.surfaceId as string);
+          this.registerSurface(createSurface.surfaceId as string);
         }
       }
 
@@ -459,6 +580,30 @@ export class A2UITransport {
   }
 
 
+
+  /**
+   * Tell the gateway that this session owns `surfaceId`.
+   *
+   * Without this mapping the gateway cannot route upstream actions from the surface, and
+   * an action that arrives without a session header is silently discarded. Surfaces the
+   * agent creates are registered automatically; surfaces the client creates itself (e.g. a
+   * locally bootstrapped chat surface) must be registered through this method.
+   *
+   * Safe to call repeatedly and before a session exists — duplicates are dropped, and
+   * calls made before the handshake are deferred until the session ID is known.
+   */
+  registerSurface(surfaceId: string): void {
+    if (this.registeredSurfaces.has(surfaceId)) return;
+
+    if (!this._sessionId) {
+      // /register-surface rejects requests without a session header, so hold the surface
+      // until handleSessionEstablished() flushes pending registrations.
+      this.pendingSurfaceRegistrations.add(surfaceId);
+      return;
+    }
+
+    void this.registerSurfaceWithGateway(surfaceId);
+  }
 
   /**
    * Register a surface with the gateway so it knows which session owns it.
@@ -479,10 +624,12 @@ export class A2UITransport {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+      this.registeredSurfaces.add(surfaceId);
     } catch (error) {
       this.emit('error', error instanceof Error ? error : new Error(String(error)));
       // Retry on next reconnect — without this mapping the gateway can't route
       // upstream actions from this surface to the correct session.
+      this.registeredSurfaces.delete(surfaceId);
       this.pendingSurfaceRegistrations.add(surfaceId);
       this.scheduleQueueRetry();
     }
@@ -498,6 +645,8 @@ export class A2UITransport {
   }
 
   private handleDisconnect(): void {
+    this.clearSessionHandshakeTimer();
+
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;

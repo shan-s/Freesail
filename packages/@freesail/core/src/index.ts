@@ -72,6 +72,7 @@ export type {
   ConnectionState,
   TransportOptions,
   TransportEvents,
+  SessionStartInfo,
 } from './transport.js';
 export { A2UITransport, createTransport } from './transport.js';
 
